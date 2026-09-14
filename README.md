@@ -1,49 +1,57 @@
-# Rockman Dash 2 Enhanced
+# 洛克人 DASH 2 增強補丁
 
-Unofficial Windows enhancements for the supported Traditional Chinese PC executable. The player package has one `RockmanDash2-Enhanced.exe` containing all three runtime features, plus a separate `Convert-DiscImage.ps1` utility. Original game files and disc images are not included.
+針對特定繁體中文版 PC 遊戲製作的非官方 Windows 補丁。玩家只需使用一個 `RockmanDash2-Enhanced.exe`，即可同時啟用過場字幕、XInput 手把及高解析度三項功能；ISO 格式轉換另由 [Convert-DiscImage.ps1](Convert-DiscImage.ps1) 處理。**補丁不含原版遊戲或光碟映像檔，請自行準備。**
 
-## Four Changes
+下載請前往 [GitHub 發行版本](https://github.com/vick0907/rockman-dash2-enhanced/releases)。初次使用建議下載檔名以 `-windows.zip` 結尾的玩家完整包，其中只有一個供玩家啟動的 EXE，並附轉換腳本、中文說明及授權文件。也可單獨下載 EXE；需要轉換 ISO 時，再下載轉換腳本。私人儲存庫的發行版本僅供有存取權的帳號下載。
 
-- Traditional Chinese captions for identified real-time cutscenes, synchronized to the game's audio playback. Ordinary native dialogue boxes are excluded. The imported catalog contains 1,144 cues: 20 opening and 1,124 story cues across 86 audio identities in five banks. This is not a claim of complete dialogue coverage or fully reviewed timing.
-- XInput controller support, Xbox button names in the native controller settings page, and right-stick mouse-look. Left stick and D-pad move; the current profile targets player 1 / slot 0. Existing game button assignments are preserved.
-- Native resolution selection up to 1920x1080, with a guarded fix to the game's video-memory arithmetic. This is higher-resolution rendering, not an aspect-correct 16:9 camera or HUD patch.
-- Separate, source-preserving MODE1/2352-to-2048-byte-sector ISO conversion. The conversion does not insert subtitles or change game files.
+## 四項改動
 
-## Requirements
+- **繁體中文過場字幕**：在已辨識的即時演算過場中，依遊戲音訊播放進度顯示字幕，不覆蓋一般原生對話框。目前收錄 1,144 則字幕，包括開場 20 則、劇情 1,124 則，對應五個音訊封存檔中的 86 組音訊識別。這不代表已涵蓋全部對白，或每一句的時間軸都經過完整人工校對。
+- **XInput 手把支援**：原生控制器設定頁顯示 Xbox 按鍵名稱，右搖桿透過原生滑鼠輸入控制視角，左搖桿與方向鍵負責移動。目前設定使用玩家 1／插槽 0，保留遊戲既有的按鍵配置。
+- **高解析度支援**：修正遊戲顯示記憶體計算，在原生選單選擇最高 `1920x1080` 的可用模式，並保留版本特徵檢查。這是提高實際繪圖解析度，**不是已完成 16:9 比例校正的鏡頭或 HUD 補丁**。
+- **獨立 ISO 格式轉換**：將 MODE1/2352 映像轉為每磁區 2048 位元組的標準 ISO，保留來源檔案。轉換不會把字幕寫進光碟，也不會修改遊戲檔案。
 
-- Windows 10/11, a writable game installation, and a compatible disc image supplied by the player. Administrator privileges are not requested by the launcher.
-- The original `dash2.exe` with SHA-256 `48baddc9250dc6b99da7ac15b3ae68b0c088489b7351f79ffb990e3384dd0ebc`, plus its original game data and sound archives. Other executable versions are rejected before launch.
-- The official [Microsoft Visual C++ x86 runtime](https://aka.ms/vs/17/release/vc_redist.x86.exe), required by Xidi even on 64-bit Windows. Installing system prerequisites may require administrator approval; the launcher does not install them automatically.
-- Microsoft JhengHei / Traditional Chinese fonts installed through Windows. Fonts are not bundled.
+## 系統需求
 
-Python, Node.js, ASR models, exported audio, and development tools are not needed to play. This package does not remove the original disc checks, install the obsolete SafeDisc driver, or require disabling security software. It is unsigned; a successful build is not a security audit.
+- Windows 10／11、可寫入的遊戲安裝資料夾，以及玩家自備的相容光碟映像檔。啟動器不會要求系統管理員權限。
+- 原版 `dash2.exe`，SHA-256 必須為 `48baddc9250dc6b99da7ac15b3ae68b0c088489b7351f79ffb990e3384dd0ebc`，並備妥原版遊戲資料與音效封存檔。不支援的主程式版本會在啟動前被拒絕載入。
+- 微軟官方 [Visual C++ x86 執行階段套件](https://aka.ms/vs/17/release/vc_redist.x86.exe)。Xidi 即使在 64 位元 Windows 上也需要 x86 版本。安裝系統相依套件可能需要系統管理員同意，啟動器不會自行安裝。
+- 透過 Windows 安裝的微軟正黑體等繁體中文字型。本補丁不附字型檔。
 
-## Play
+遊玩不需要 Python、Node.js、語音辨識模型、匯出的音訊或開發工具。本補丁不移除原版光碟驗證，不安裝過時的 SafeDisc 驅動程式，也不要求關閉防毒或其他安全防護。目前執行檔未經數位簽章；成功建置不代表已完成安全稽核。
 
-1. Extract the player ZIP into a separate folder. Copy `RockmanDash2-Enhanced.exe` and [Convert-DiscImage.ps1](Convert-DiscImage.ps1) beside your original `dash2.exe`. Keep the documentation and licenses with any redistributed package.
-2. Convert your raw image once, from PowerShell in that game folder:
+## 開始遊玩
+
+1. 將玩家版 ZIP 解壓縮到獨立資料夾，再將 `RockmanDash2-Enhanced.exe` 與 [Convert-DiscImage.ps1](Convert-DiscImage.ps1) 放到原版 `dash2.exe` 所在的遊戲資料夾。重新分享補丁時，請一併保留說明與授權文件。
+2. 若使用原始磁區格式的映像，在遊戲資料夾開啟 PowerShell，執行一次轉換：
 
    ```powershell
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Convert-DiscImage.ps1 -SourcePath .\gamez88_d2.iso
    ```
 
-   This produces `gamez88_d2.windows.iso`. The original is opened read-only. Repeating the conversion reuses identical output but refuses to overwrite different content. Only complete MODE1/2352 data tracks are supported, not MODE2, audio tracks, or mixed-mode layouts. An already-standard ISO is returned unchanged.
-3. Double-click `RockmanDash2-Enhanced.exe`. All three features are enabled together. In the original display menu, select an available resolution such as `1920x1080x32`.
-4. Keep the launcher console open and exit normally through the game so its own settings writer runs. Only a disc mount created by this launch is ejected; existing mounts are left mounted. Do not run multiple game sessions simultaneously.
+   這會產生 `gamez88_d2.windows.iso`，來源映像僅以唯讀方式開啟。重複執行時會沿用內容完全相同的結果，但拒絕覆寫內容不同的既有檔案。只支援完整的 MODE1/2352 資料軌，不支援 MODE2、音軌或混合模式配置。若來源已是標準 ISO，則直接回傳原檔路徑，不做轉換。
+3. 雙擊 `RockmanDash2-Enhanced.exe`，三項遊戲功能就會一併啟用。解析度請在遊戲原生顯示設定選單中選擇，例如 `1920x1080x32`。
+4. 遊玩時請保留啟動器的主控台視窗，並透過遊戲正常離開，讓遊戲儲存設定。結束時只會卸載本次啟動器自行掛載的映像；原先已掛載的光碟會保留。請勿同時執行多個遊戲程序。
 
-For a differently named standard ISO:
+若標準 ISO 使用其他檔名或路徑，可自行指定：
 
 ```powershell
 .\RockmanDash2-Enhanced.exe --iso "D:\Games\MyDisc.windows.iso"
 ```
 
-The EXE is a single-file distribution, not an in-place rewrite of the game. It embeds the feature DLLs, an internal worker, captions, controller profile, and licenses. Windows loads those modules after they are extracted into an adjacent `dash2-enhanced-<content-id>` directory. No files are extracted into Windows system directories. ISO conversion stays separate; normal mounting and cleanup are internal.
+### 單一 EXE 如何運作
 
-Existing immutable runtime files must match their embedded hashes. Different content is not overwritten or loaded. Player edits to `xinput/Xidi.ini` in that runtime directory are preserved. Use only settings supported by [Xidi 5](https://github.com/samuelgr/Xidi/wiki), and restart after changes. For example, the existing `[Properties]` section supports `MouseSpeedScalingFactorPercent` (100 is the default). Xidi rejects an entire configuration containing unrecognized sections; do not ignore its configuration warnings.
+這是**單檔封裝的啟動器**，不是改寫或取代原版遊戲主程式。它內嵌功能 DLL、內部輔助 EXE、字幕、手把設定及授權文件，執行時展開到遊戲旁的 `dash2-enhanced-<content-id>` 資料夾，再由 Windows 載入。玩家只需使用同一個啟動入口，不必分別啟動三項功能。
 
-New payloads receive a different runtime directory. Controller profile edits are not automatically migrated between versions. The game executable, its configuration, saves, and original disc image are not replaced by the package. To uninstall, exit the game and remove this EXE and its `dash2-enhanced-*` runtime directory. Keep your game, saves, settings, and images.
+不會將檔案寫入 Windows 系統資料夾。ISO 格式轉換維持獨立；日常遊玩所需的掛載與結束清理由啟動器處理。
 
-## Diagnose
+### 設定、更新與移除
+
+程式與字幕等不可編輯的執行檔案，必須符合內嵌的雜湊值；內容不同時不會覆寫或載入。玩家對執行資料夾內 `xinput/Xidi.ini` 的修改則會保留。請只使用 [Xidi 5](https://github.com/samuelgr/Xidi/wiki) 支援的設定，修改後重新啟動。例如，可在既有的 `[Properties]` 區段加入 `MouseSpeedScalingFactorPercent` 調整視角速度，預設值為 100。Xidi 遇到不認識的區段會拒絕套用整份設定，請勿忽略設定檔警告。
+
+內嵌內容更新後，啟動器會使用不同的執行資料夾，不會自動搬移舊版手把設定。本補丁不會取代原版主程式、遊戲設定、存檔或原始光碟映像。若要移除，先結束遊戲，再刪除增強啟動器 EXE 與它建立的 `dash2-enhanced-*` 資料夾即可；請保留原版遊戲、存檔、設定及映像檔。
+
+## 檢查與疑難排解
 
 ```powershell
 .\RockmanDash2-Enhanced.exe --self-test
@@ -51,17 +59,17 @@ New payloads receive a different runtime directory. Controller profile edits are
 .\RockmanDash2-Enhanced.exe --check-only
 ```
 
-- `--self-test`: verify embedded hashes without extraction or game files.
-- `--diagnose`: extract and run subtitle, controller-interface, and native graphics diagnostics without a game or disc.
-- `--check-only`: also validate the original executable and mount/read the standard ISO, without starting the game.
-- `--extract-only`: prepare the runtime without loading any modules.
-- `--game-directory PATH`: select an existing directory instead of the EXE's folder. Choose only one diagnostic mode at a time.
+- `--self-test`：檢查內嵌檔案雜湊，不展開檔案，也不需要原版遊戲。
+- `--diagnose`：展開檔案並執行字幕、手把介面及原生繪圖診斷，不需要遊戲或光碟。
+- `--check-only`：另外檢查原版主程式，並掛載、讀取標準 ISO，但不啟動遊戲。
+- `--extract-only`：只準備執行資料夾，不載入任何功能模組。
+- `--game-directory PATH`：改用指定的既有資料夾，而非 EXE 所在位置。每次只能選擇一種診斷模式。
 
-Errors remain in the console; a double-click failure also shows a message box. Runtime logs are local, with no upload or telemetry. Existing feature diagnostics can capture the launched game's own foreground client area and record local paths and process information. Inspect logs before sharing them. Captures and debug artifacts do not belong in the source repository or player package.
+錯誤會顯示在主控台；雙擊啟動失敗時也會出現訊息視窗。紀錄檔只留在本機，不會自動上傳，也沒有遙測。既有功能診斷可能擷取本次啟動遊戲的前景視窗用戶區，並記錄本機路徑與程序資訊；分享紀錄前請先檢查內容。截圖及除錯產物不應加入原始碼儲存庫或玩家版補丁。
 
-## Build and Test
+## 建置與測試
 
-From a Windows PowerShell session in this repository:
+在本儲存庫資料夾開啟 Windows PowerShell，依序執行：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build.ps1
@@ -69,22 +77,22 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-DiscConvers
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-Package.ps1
 ```
 
-The build fetches checksum-pinned official Zig 0.14.1 and Xidi 5.0.0 archives. Required SafeDiscShim, MinHook, and nlohmann/json sources are vendored. No original game, media extraction, or proprietary SDK is needed to compile. Diagnostics require the runtime prerequisites and a Windows graphics environment; they are not a headless CI guarantee.
+建置腳本會下載官方 Zig 0.14.1 與 Xidi 5.0.0 封存檔，並依預先指定的雜湊值驗證。所需的 SafeDiscShim、MinHook 與 nlohmann/json 原始碼已隨儲存庫收錄。編譯不需要原版遊戲、媒體擷取工具或專有 SDK。診斷仍需要前述執行環境與 Windows 繪圖環境，不能視為保證可在無圖形介面的持續整合環境中執行。
 
-Use `-ZigPath PATH` and `-XidiArchivePath PATH` to reuse a trusted existing compiler and the pinned archive. `-ModulesOnly` builds the internal modules. `-PackageOnly` repackages already-built modules and is intended only when module sources have not changed; use a full build after editing feature code. The player EXE is written to `dist/RockmanDash2-Enhanced.exe`.
+可透過 `-ZigPath PATH`、`-XidiArchivePath PATH` 使用既有且可信任的編譯器及指定版本封存檔。`-ModulesOnly` 只建置內部模組；`-PackageOnly` 沿用已建置的模組重新封裝，**只適用於模組原始碼未變更的情況**。修改功能程式碼後，請執行完整建置。玩家使用的 EXE 會輸出到 `dist/RockmanDash2-Enhanced.exe`。
 
-After testing and committing the matching sources, run [Package.ps1](Package.ps1). It requires a clean Git worktree, validates the recorded inputs and EXE, audits tracked files, and creates the player ZIP, a corresponding-source ZIP, and SHA256SUMS in `dist`. It refuses to replace an existing version's archives. `-CheckOnly` validates the current build inputs without requiring a Git commit or creating archives.
+測試通過並提交對應原始碼後，執行 [Package.ps1](Package.ps1)。它要求 Git 工作區沒有未提交的變更，會驗證已記錄的建置輸入與 EXE、稽核納入版本控制的檔案，再於 `dist` 產生玩家版 ZIP、對應原始碼 ZIP 與 SHA256SUMS 雜湊清單；不會覆寫相同版本的既有封存檔。加上 `-CheckOnly` 時，只檢查目前建置輸入，不要求已有 Git 提交，也不產生封存檔。
 
-Line-ending conversion is disabled to preserve imported source and catalog hashes. Build products, game assets, images, saves, logs, personal agent configuration, and model environments are ignored by Git. The packaging script also enforces a positive source-file allowlist.
+為保留匯入原始碼與字幕資料的雜湊值，本專案停用 Git 自動換行轉換。建置產物、原版遊戲素材、映像檔、存檔、紀錄、個人 AI 助理設定及模型環境都已加入 Git 排除規則；發行腳本另外使用明確的來源檔案白名單。
 
-## Verification Limits
+## 驗證範圍與已知限制
 
-The existing three-feature integration was exercised on the development PC. The repository packaging tests cover embedded/extracted bytes, Unicode and bracket paths, valid controller-setting preservation, Xidi error-log checks, rejection of altered modules and unsupported executables, subtitle clock/eligibility diagnostics, native input interfaces, and 1080p offscreen allocation. ISO tests use synthetic sectors and check payload identity, malformed layouts, existing-output protection, and temporary-file cleanup.
+既有的三功能整合已在開發用電腦上實際遊玩測試。本儲存庫的封裝測試涵蓋內嵌與展開檔案的一致性、Unicode 與中括號路徑、合法手把設定的保留、Xidi 錯誤紀錄檢查、遭修改模組與不支援主程式的拒絕載入、字幕時鐘及顯示條件診斷、原生輸入介面，以及 1080p 離屏繪圖資源配置。ISO 測試以合成磁區驗證資料一致性、錯誤格式、既有檔案保護與暫存檔清理。
 
-The packaged EXE has not yet completed a fresh full gameplay session or been accepted on a second PC. The latest caption additions have not all been replayed in-game. Physical hotplug, arbitrary controller-slot changes, rumble, Alt-Tab recovery, windowed presentation, long playthroughs, and fully aspect-correct widescreen remain unverified or unimplemented. No new Winlator support is promised.
+**新的單檔 EXE 尚未完成一輪完整的實際遊玩，也尚未在第二台電腦驗收。** 最新增補的字幕尚未全數在遊戲中重播確認。實體手把熱插拔、任意玩家插槽切換、震動、Alt-Tab 切換後恢復、視窗模式呈現、長時間遊玩，以及完整比例校正的寬螢幕畫面，仍有未驗證或未實作的部分。本版本不承諾新增 Winlator 支援。
 
-## Source and Rights
+## 原始碼與權利聲明
 
-See [LICENSE.md](LICENSE.md) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The compatibility implementation retains SafeDiscShim's GPL-3.0-or-later terms and additional permission; other components retain their upstream licenses. Always give binary recipients access to the matching corresponding source, including when this repository is private.
+請參閱 [LICENSE.md](LICENSE.md) 與[第三方元件及授權說明](THIRD_PARTY_NOTICES.md)。相容層保留 SafeDiscShim 的 GPL-3.0-or-later 條款與額外許可，其他元件保留各自的原始授權。提供執行檔給他人時，必須讓接收者能取得對應版本的完整原始碼；儲存庫設為私人時也不例外。
 
-Caption text is an unofficial adaptation; underlying game dialogue, assets, and trademarks remain with their respective owners. Provenance fields in the imported subtitle JSON refer to historical local review files that are intentionally not distributed. No original audio, runtime memory images, third-party fansub video, screenshots, game executable, saves, or disc images are included. Distribution of adaptations remains subject to the rights applicable to that content; the software license does not grant rights to the original game.
+字幕是非官方的遊戲對白改作，原作對白、素材與商標的權利仍屬各自權利人。字幕 JSON 中的來源欄位指向歷史本機校對資料，這些資料刻意不隨補丁散布。補丁不包含原版音訊、執行時記憶體映像、第三方玩家字幕影片、截圖、原版遊戲主程式、存檔或光碟映像檔。散布改作仍須符合相關內容的權利規範，軟體授權不等於取得原版遊戲的散布權。

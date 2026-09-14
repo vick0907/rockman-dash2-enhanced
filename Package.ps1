@@ -78,7 +78,7 @@ try {
     [IO.Compression.ZipFile]::CreateFromDirectory($stage, $playerArchive)
     & git -C $PSScriptRoot archive --format=zip ('--output=' + $sourceArchive) HEAD
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the corresponding-source archive.' }
-    $checksums = @($playerArchive, $sourceArchive, $executable) | ForEach-Object {
+    $checksums = @($playerArchive, $sourceArchive, $executable, (Join-Path $PSScriptRoot 'Convert-DiscImage.ps1')) | ForEach-Object {
         (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + [IO.Path]::GetFileName($_)
     }
     [IO.File]::WriteAllText($checksumPath, (($checksums -join "`n") + "`n"), [Text.Encoding]::ASCII)

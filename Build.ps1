@@ -183,7 +183,7 @@ try {
     } finally { $hasher.Dispose() }
     $runtimeFolder = 'dash2-enhanced-' + $packageId
     $gameHash = '48baddc9250dc6b99da7ac15b3ae68b0c088489b7351f79ffb990e3384dd0ebc'
-    $header = @('static constexpr const char* packageVersion = "0.1.0";',
+    $header = @('static constexpr const char* packageVersion = "0.1.1";',
         ('static constexpr const wchar_t* runtimeFolder = L"' + $runtimeFolder + '";'),
         ('static constexpr const char* supportedGameSha256 = "' + $gameHash + '";'),
         'static constexpr PayloadAsset payloadAssets[] = {')
@@ -224,7 +224,7 @@ try {
     })
     [IO.File]::WriteAllText((Join-Path $buildDirectory 'payload-manifest.json'),
         ([ordered]@{
-            version = '0.1.0'
+            version = '0.1.1'
             runtime_folder = $runtimeFolder
             game_sha256 = $gameHash
             executable_sha256 = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()

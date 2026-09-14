@@ -1,22 +1,24 @@
-# Licensing and Third-Party Notices
+# 第三方元件及授權說明
 
-This is an unofficial, game-local compatibility and enhancement project. It is not an official Capcom or SafeDiscShim release. It does not include or license the original game, disc images, audio, graphics, fonts, or trademarks.
+這是僅作用於遊戲本身的非官方相容與增強專案，並非 Capcom 或 SafeDiscShim 的官方發行版本。本專案不包含原版遊戲、光碟映像檔、音訊、圖像或字型，也不授予這些內容及相關商標的使用權。
 
-The project code is provided under GPL-3.0-or-later, with the SafeDisc linking permission retained in LICENSE.md. Original upstream copyright and license notices are preserved. Subtitle translations are unofficial adaptations of game dialogue; the code license does not grant rights to the underlying game or dialogue.
+本專案程式碼以 GPL-3.0-or-later 提供，並在 [LICENSE.md](LICENSE.md) 保留與 SafeDisc 連結的額外許可。各上游專案的著作權與授權聲明均保留原文。字幕翻譯是遊戲對白的非官方改作，程式碼授權不授予原版遊戲或對白的相關權利。
 
-## Incorporated Components
+## 使用的第三方元件
 
-| Component | Version / Revision | License | Source |
+| 元件 | 版本／修訂 | 授權 | 來源 |
 | --- | --- | --- | --- |
-| SafeDiscShim IOCTL implementation | 759b10399e81f971faf11d87e805463ff5e413cf | GPL-3.0-or-later with additional permission | https://github.com/RibShark/SafeDiscShim/tree/759b10399e81f971faf11d87e805463ff5e413cf |
-| MinHook | 1.3.4 | BSD-2-Clause; retained HDE notices | https://github.com/TsudaKageyu/minhook/tree/v1.3.4 |
+| SafeDiscShim IOCTL 實作 | 759b10399e81f971faf11d87e805463ff5e413cf | GPL-3.0-or-later，含額外許可 | https://github.com/RibShark/SafeDiscShim/tree/759b10399e81f971faf11d87e805463ff5e413cf |
+| MinHook | 1.3.4 | BSD-2-Clause；保留 HDE 聲明 | https://github.com/TsudaKageyu/minhook/tree/v1.3.4 |
 | nlohmann/json | 3.11.3 | MIT | https://github.com/nlohmann/json/tree/v3.11.3 |
-| Xidi | 5.0.0, official x86 release | BSD-3-Clause | https://github.com/samuelgr/Xidi/releases/tag/v5.0.0 |
-| LLVM libc++ and libc++abi | As shipped with Zig 0.14.1 | Apache-2.0 with LLVM exceptions and retained notices | https://ziglang.org/download/0.14.1/release-notes.html |
-| MinGW-w64 runtime | As shipped with Zig 0.14.1 | Component-specific notices in COPYING | https://www.mingw-w64.org/ |
+| Xidi | 5.0.0，官方 x86 發行版 | BSD-3-Clause | https://github.com/samuelgr/Xidi/releases/tag/v5.0.0 |
+| LLVM libc++ 與 libc++abi | Zig 0.14.1 隨附版本 | Apache-2.0，含 LLVM 例外條款及保留聲明 | https://ziglang.org/download/0.14.1/release-notes.html |
+| MinGW-w64 執行階段 | Zig 0.14.1 隨附版本 | 依 COPYING 中各元件的授權聲明 | https://www.mingw-w64.org/ |
 
-Relevant upstream sources and licenses are in third_party. Xidi binaries and Zig are fetched from pinned official archives by Build.ps1; neither the original game nor a proprietary SDK is needed to compile this project. Microsoft Windows system libraries and the separately installed Microsoft Visual C++ runtime are not bundled.
+相關上游原始碼及授權收錄於 `third_party`。Xidi 執行檔與 Zig 由 [Build.ps1](Build.ps1) 下載指定版本的官方封存檔，並以雜湊值驗證。編譯本專案不需要原版遊戲或專有 SDK。本補丁不附 Microsoft Windows 系統程式庫，也不附需另行安裝的 Microsoft Visual C++ 執行階段套件。
 
-The single EXE embeds the third-party license texts and extracts them into its private runtime's licenses directory. The player archive also carries these notices and LICENSE.md. Distributing the EXE requires providing recipients with its complete corresponding source, including the vendored sources and build scripts. A private GitHub URL is not sufficient for recipients who cannot access it; provide the matching source archive with the player package.
+單一 EXE 會內嵌第三方授權原文，並展開到專用執行資料夾中的 `licenses`。玩家版封存檔也會附上本說明與 [LICENSE.md](LICENSE.md)。散布 EXE 時，必須向接收者提供完整的對應原始碼，包括隨附的第三方原始碼及建置腳本。若接收者沒有私人 GitHub 儲存庫的存取權，只提供網址並不足夠；請一併提供與玩家版相符的原始碼封存檔。
 
-The SafeDisc IOCTL code is used for user-mode compatibility. This project does not install the obsolete driver, remove the game's own disc checks, or require disabling Windows security.
+SafeDisc IOCTL 程式碼用於使用者模式的相容處理。本專案不安裝過時的驅動程式，不移除遊戲本身的光碟驗證，也不要求停用 Windows 安全防護。
+
+本文件是繁體中文說明，不取代或修改各元件的正式授權條款；正式條款請以隨附的原始授權文件為準。
