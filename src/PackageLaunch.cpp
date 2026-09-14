@@ -285,7 +285,7 @@ int wmain(int argumentCount, wchar_t** arguments) {
         if (mode == L"--check-only") options += L" -CheckOnly";
         if (!imagePath.empty()) options += L" -ImagePath " + QuoteArgument(imagePath);
         int result = Run(powershell, options, gameDirectory);
-        if (result != 0) throw std::runtime_error("Launch or preflight failed. See the console and runtime logs. Windows 10/11 and the x86 Visual C++ runtime are required.");
+        if (result != 0) throw std::runtime_error("Launch or preflight failed. See the specific error above and the runtime logs.");
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << std::endl;

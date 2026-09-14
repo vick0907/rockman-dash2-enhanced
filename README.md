@@ -13,7 +13,7 @@
 
 ## 系統需求
 
-- Windows 10／11、可寫入的遊戲安裝資料夾，以及玩家自備的相容光碟映像檔。啟動器不會要求系統管理員權限。
+- Windows 10／11、可寫入的遊戲安裝資料夾，以及已掛載的正確遊戲光碟，或玩家自備的相容標準 ISO。啟動器不會要求系統管理員權限。
 - 原版 `dash2.exe`，SHA-256 必須為 `48baddc9250dc6b99da7ac15b3ae68b0c088489b7351f79ffb990e3384dd0ebc`，並備妥原版遊戲資料與音效封存檔。不支援的主程式版本會在啟動前被拒絕載入。
 - 微軟官方 [Visual C++ x86 執行階段套件](https://aka.ms/vs/17/release/vc_redist.x86.exe)。Xidi 即使在 64 位元 Windows 上也需要 x86 版本。安裝系統相依套件可能需要系統管理員同意，啟動器不會自行安裝。
 - 透過 Windows 安裝的微軟正黑體等繁體中文字型。本補丁不附字型檔。
@@ -23,7 +23,11 @@
 ## 開始遊玩
 
 1. 將玩家版 ZIP 解壓縮到獨立資料夾，再將 `RockmanDash2-Enhanced.exe` 與 [Convert-DiscImage.ps1](Convert-DiscImage.ps1) 放到原版 `dash2.exe` 所在的遊戲資料夾。重新分享補丁時，請一併保留說明與授權文件。
-2. 若使用原始磁區格式的映像，在遊戲資料夾開啟 PowerShell，執行一次轉換：
+2. **若已掛載先前可用的遊戲光碟，可跳過轉換。** 啟動器會先尋找 CD-ROM 類型、卷標為 `ROCKMANDASH2`，且 `DATA1.CAB` 大小與 SHA-256 符合已驗證版本的光碟。即使 ISO 位於其他資料夾，或遊戲目錄只有尚未轉換的原始映像，也可直接沿用。
+
+   **不限定 D 槽。** 啟動器會檢查所有光碟機，掛載到 E、F 或其他磁碟機代號也可辨識；不會因為第一台光碟機放的是其他光碟，就停止尋找。
+
+   若沒有符合條件的掛載，啟動器才會尋找遊戲資料夾內的 `gamez88_d2.windows.iso`。若只有 MODE1/2352 原始映像，在遊戲資料夾開啟 PowerShell，執行一次轉換：
 
    ```powershell
    powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Convert-DiscImage.ps1 -SourcePath .\gamez88_d2.iso
@@ -33,11 +37,13 @@
 3. 雙擊 `RockmanDash2-Enhanced.exe`，三項遊戲功能就會一併啟用。解析度請在遊戲原生顯示設定選單中選擇，例如 `1920x1080x32`。
 4. 遊玩時請保留啟動器的主控台視窗，並透過遊戲正常離開，讓遊戲儲存設定。結束時只會卸載本次啟動器自行掛載的映像；原先已掛載的光碟會保留。請勿同時執行多個遊戲程序。
 
-若標準 ISO 使用其他檔名或路徑，可自行指定：
+若要明確指定其他標準 ISO，可使用：
 
 ```powershell
 .\RockmanDash2-Enhanced.exe --iso "D:\Games\MyDisc.windows.iso"
 ```
+
+`--iso` 優先於自動辨識既有光碟；指定的路徑不存在或無法使用時會報錯，不會悄悄改用其他掛載。自動辨識只檢查既有光碟，不會複製或轉換映像，也不會卸載玩家原先的掛載。這是啟動前的光碟身分檢查，原版遊戲自己的光碟驗證仍保留。
 
 ### 單一 EXE 如何運作
 
@@ -61,7 +67,7 @@
 
 - `--self-test`：檢查內嵌檔案雜湊，不展開檔案，也不需要原版遊戲。
 - `--diagnose`：展開檔案並執行字幕、手把介面及原生繪圖診斷，不需要遊戲或光碟。
-- `--check-only`：另外檢查原版主程式，並掛載、讀取標準 ISO，但不啟動遊戲。
+- `--check-only`：另外檢查原版主程式，並驗證已掛載光碟；必要時才掛載標準 ISO，不啟動遊戲。
 - `--extract-only`：只準備執行資料夾，不載入任何功能模組。
 - `--game-directory PATH`：改用指定的既有資料夾，而非 EXE 所在位置。每次只能選擇一種診斷模式。
 
@@ -77,6 +83,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-DiscConvers
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-Package.ps1
 ```
 
+`Test-Package.ps1 -DiscOnly` 可單獨執行光碟辨識測試。若已掛載正確光碟，可再加上 `-GameExecutable PATH`，以自備的原版主程式測試「暫存遊戲目錄內沒有 ISO，但仍能沿用已掛載光碟」的完整流程；測試不會啟動遊戲，也不會修改來源主程式或移除既有掛載。
+
 建置腳本會下載官方 Zig 0.14.1 與 Xidi 5.0.0 封存檔，並依預先指定的雜湊值驗證。所需的 SafeDiscShim、MinHook 與 nlohmann/json 原始碼已隨儲存庫收錄。編譯不需要原版遊戲、媒體擷取工具或專有 SDK。診斷仍需要前述執行環境與 Windows 繪圖環境，不能視為保證可在無圖形介面的持續整合環境中執行。
 
 可透過 `-ZigPath PATH`、`-XidiArchivePath PATH` 使用既有且可信任的編譯器及指定版本封存檔。`-ModulesOnly` 只建置內部模組；`-PackageOnly` 沿用已建置的模組重新封裝，**只適用於模組原始碼未變更的情況**。修改功能程式碼後，請執行完整建置。玩家使用的 EXE 會輸出到 `dist/RockmanDash2-Enhanced.exe`。
@@ -87,7 +95,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-Package.ps1
 
 ## 驗證範圍與已知限制
 
-既有的三功能整合已在開發用電腦上實際遊玩測試。本儲存庫的封裝測試涵蓋內嵌與展開檔案的一致性、Unicode 與中括號路徑、合法手把設定的保留、Xidi 錯誤紀錄檢查、遭修改模組與不支援主程式的拒絕載入、字幕時鐘及顯示條件診斷、原生輸入介面，以及 1080p 離屏繪圖資源配置。ISO 測試以合成磁區驗證資料一致性、錯誤格式、既有檔案保護與暫存檔清理。
+既有的三功能整合已在開發用電腦上實際遊玩測試。本儲存庫的封裝測試涵蓋內嵌與展開檔案的一致性、Unicode 與中括號路徑、合法手把設定的保留、Xidi 錯誤紀錄檢查、遭修改模組與不支援主程式的拒絕載入、字幕時鐘及顯示條件診斷、原生輸入介面，以及 1080p 離屏繪圖資源配置。光碟辨識另測試固定磁碟、不同卷標、同名但不同內容、錯誤檔案大小、不可讀取媒體及列舉失敗等情況。ISO 測試以合成磁區驗證資料一致性、錯誤格式、既有檔案保護與暫存檔清理。
 
 **新的單檔 EXE 尚未完成一輪完整的實際遊玩，也尚未在第二台電腦驗收。** 最新增補的字幕尚未全數在遊戲中重播確認。實體手把熱插拔、任意玩家插槽切換、震動、Alt-Tab 切換後恢復、視窗模式呈現、長時間遊玩，以及完整比例校正的寬螢幕畫面，仍有未驗證或未實作的部分。本版本不承諾新增 Winlator 支援。
 
