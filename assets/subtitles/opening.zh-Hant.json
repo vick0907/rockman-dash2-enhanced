@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "archive": "XA02_37.DAT",
+  "track": 1,
+  "language": "zh-Hant",
+  "source_language": "ja",
+  "source_audio": "media-export/audio/Xa02_37/track-001.mp3",
+  "source_sha256": "3cd268fe55accb7e00b595bec1acd075cbe530c4f8f59900cb04195b78663a36",
+  "duration_ms": 140722,
+  "status": "draft",
+  "notes": [
+    "Original speech and word timings were generated with Whisper large-v3; Chinese translation was authored by Copilot, not a local translation model.",
+    "The spurious opening thank-you phrase was excluded: no-speech probability was 0.8745 and its final words had zero duration.",
+    "Cue ends include short reading holds and never overlap the next cue.",
+    "Names follow media-export/translations/terminology.zh-TW.json. The announced ウェルナー・フォン・ミュラー is matched to 渥爾納・馮・謬拉 in the cited Taiwan community reference, not claimed as an official localization. Short interjections still need listening review."
+  ],
+  "cues": [
+    {
+      "start_ms": 45760,
+      "end_ms": 47060,
+      "ja": "入るぞ",
+      "text": "我進來了。"
+    },
+    {
+      "start_ms": 51870,
+      "end_ms": 54750,
+      "ja": "そろそろ始めようと思うんだが",
+      "text": "我想差不多該開始了。"
+    },
+    {
+      "start_ms": 60540,
+      "end_ms": 62300,
+      "ja": "もう10年になるか",
+      "text": "已經十年了啊。"
+    },
+    {
+      "start_ms": 62600,
+      "end_ms": 65460,
+      "ja": "娘さん夫婦がこの島で遭難したのは",
+      "text": "自從你女兒和女婿在這座島上遇難以來。"
+    },
+    {
+      "start_ms": 66710,
+      "end_ms": 69490,
+      "ja": "馬鹿じゃよ二人とも",
+      "text": "真是兩個傻孩子啊..."
+    },
+    {
+      "start_ms": 70670,
+      "end_ms": 74510,
+      "ja": "幼い子を残したまま行ってしまいよって",
+      "text": "竟然丟下還小的孩子，\n就這樣走了。"
+    },
+    {
+      "start_ms": 77590,
+      "end_ms": 82850,
+      "ja": "なあ思い直さんかあれに手を出すのは",
+      "text": "我說，你就不能再考慮一下嗎？\n那個東西，還是別去碰了。"
+    },
+    {
+      "start_ms": 84020,
+      "end_ms": 85690,
+      "ja": "今さら辞められん",
+      "text": "事到如今，怎麼能放棄。"
+    },
+    {
+      "start_ms": 85960,
+      "end_ms": 88780,
+      "ja": "わしの人生すべてあれにかけたんだ",
+      "text": "我把這一生，全都賭在那上面了。"
+    },
+    {
+      "start_ms": 89280,
+      "end_ms": 91240,
+      "ja": "今さら辞められるか",
+      "text": "怎能在這時候放棄！"
+    },
+    {
+      "start_ms": 91440,
+      "end_ms": 93360,
+      "ja": "ウェルナーフォンミュラー様",
+      "text": "渥爾納・馮・謬拉大人！"
+    },
+    {
+      "start_ms": 93620,
+      "end_ms": 94240,
+      "ja": "ん?",
+      "text": "嗯？"
+    },
+    {
+      "start_ms": 94380,
+      "end_ms": 95600,
+      "ja": "おーいかんいかん",
+      "text": "啊，糟了、糟了！"
+    },
+    {
+      "start_ms": 96060,
+      "end_ms": 97830,
+      "ja": "じゃあ先に行っとるからな",
+      "text": "那我就先過去了。"
+    },
+    {
+      "start_ms": 101820,
+      "end_ms": 104850,
+      "ja": "結局お孫さんは来なかったんだな",
+      "text": "結果，你孫女還是沒來啊。"
+    },
+    {
+      "start_ms": 105080,
+      "end_ms": 105850,
+      "ja": "え?",
+      "text": "嗯？"
+    },
+    {
+      "start_ms": 106480,
+      "end_ms": 107280,
+      "ja": "あぁ…",
+      "text": "是啊...",
+      "review_id": "written-recheck-opening-acknowledgment",
+      "written_evidence": {
+        "report": "media-export/asr-review/utterance-recheck-opening-20260914.json",
+        "sha256": "939f7ee15230e2f4fbb64683fbfc2ff7fde6a420716be7145e0fcd947107c810",
+        "finding": "recheck-opening-acknowledgment",
+        "frame": {
+          "source": "rmmh-native-caption-frames",
+          "part": 1,
+          "video_seconds": 120,
+          "path": "pc-compat/build/reference-youtube/utterance-audit-opening-20260914/proofs/120.png",
+          "sha256": "503bc909cdd3f9935d4b1401fcebe653278b12ee7fffc43e606ca39384adabe1"
+        },
+        "timing_report": "media-export/asr-review/utterance-recheck-20260914/opening-acknowledgment.json",
+        "timing_sha256": "95a078037056ed3e43d2089d7431e975ac93abdd7e5799539b14d0d251528682",
+        "source_segments": [
+          3,
+          3
+        ],
+        "timed_ja": "ああ",
+        "speech_end_ms": 106880
+      }
+    },
+    {
+      "start_ms": 108260,
+      "end_ms": 112520,
+      "ja": "先に見つけられるんじゃないかと落ち込んどるみたいじゃ",
+      "text": "她好像擔心被人搶先找到，\n有些沮喪呢。"
+    },
+    {
+      "start_ms": 113670,
+      "end_ms": 117330,
+      "ja": "ロールもずっとあれを追いかけてきたからの",
+      "text": "蘿兒也一直在追尋那個東西啊。"
+    },
+    {
+      "start_ms": 118770,
+      "end_ms": 122950,
+      "ja": "いくらあの子が可愛くてもこれだけは譲れんからな",
+      "text": "再怎麼疼她，\n唯獨這件事我可不能讓步。"
+    }
+  ]
+}
