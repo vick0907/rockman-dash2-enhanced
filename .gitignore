@@ -45,3 +45,7 @@ SKILL.md
 *.agent.md
 *.prompt.md
 *.instructions.md
+!/docs/screenshots/subtitles-opening.png
+!/docs/screenshots/subtitles-1080p.png
+!/docs/screenshots/xinput-buttons.png
+!/docs/screenshots/resolution-1080p.png
