@@ -38,10 +38,53 @@ struct SubtitleTrack {
     std::string archive = "XA02_37.DAT";
 };
 
+enum class SubtitleTrackKind { Cinematic, GameplayRadio, RollBath, BossRadio, BattleRadio, EndingSong };
+
 static constexpr std::array<const char*, 5> subtitleArchives = {
     "XA02_37.DAT", "XA12_37.DAT", "XA15_37.DAT", "XA1F_37.DAT", "XA40_37.DAT"
 };
 static constexpr std::array<unsigned, 5> archiveTrackLimits = {30, 23, 19, 26, 8};
+static constexpr uint32_t cinematicCallbackEnd = 0x53ecc0;
+static constexpr std::array<unsigned, 8> gameplayRadioTrackNumbers = {5, 6, 8, 9, 10, 29, 30, 31};
+static constexpr std::array<unsigned, 9> bossRadioTrackNumbers = {31, 32, 38, 39, 33, 34, 35, 36, 37};
+static constexpr std::array<unsigned, 5> battleRadioTrackNumbers = {25, 27, 29, 28, 34};
+static constexpr unsigned rollBathDiagnosticTrack = 192;
+static constexpr unsigned bossRadioDiagnosticStart = 193;
+static constexpr unsigned battleRadioDiagnosticStart = bossRadioDiagnosticStart + bossRadioTrackNumbers.size();
+static constexpr unsigned endingSongDiagnosticTrack = battleRadioDiagnosticStart + battleRadioTrackNumbers.size();
+static constexpr unsigned maximumDiagnosticTrack = endingSongDiagnosticTrack;
+
+static bool IsEndingSongTrack(const SubtitleTrack& track) {
+    return track.archive == "STAFF.DAT" && track.number == 1;
+}
+
+static bool IsBattleRadioTrack(unsigned number) {
+    return std::find(battleRadioTrackNumbers.begin(), battleRadioTrackNumbers.end(), number) != battleRadioTrackNumbers.end();
+}
+
+static bool IsBossRadioTrack(unsigned number) {
+    return std::find(bossRadioTrackNumbers.begin(), bossRadioTrackNumbers.end(), number) != bossRadioTrackNumbers.end();
+}
+
+static bool IsRollBathTrack(const SubtitleTrack& track) {
+    return track.archive == "XACOM_18.DAT" && track.number == 4;
+}
+
+static bool IsGameplayRadioTrack(unsigned number) {
+    return std::find(gameplayRadioTrackNumbers.begin(), gameplayRadioTrackNumbers.end(), number) != gameplayRadioTrackNumbers.end();
+}
+
+static bool IsLateGameplayRadioTrack(unsigned number) {
+    return number == 29 || number == 30 || number == 31;
+}
+
+static size_t GameplayRadioMessageChannel(unsigned number) {
+    return number == 30 || number == 31 ? 2 : 4;
+}
+
+static uint32_t GameplayRadioDescriptor(unsigned number) {
+    return number == 31 ? 0x8ebee0 : 0x8f4660;
+}
 
 static int SubtitleArchiveIndex(const char* archive) {
     if (!archive) return -1;
@@ -52,6 +95,21 @@ static int SubtitleArchiveIndex(const char* archive) {
 }
 
 static unsigned DiagnosticTrackNumber(const SubtitleTrack& track) {
+    if (IsEndingSongTrack(track)) return endingSongDiagnosticTrack;
+    if (track.archive == "XA40_18.DAT") {
+        for (size_t index = 0; index < battleRadioTrackNumbers.size(); ++index) {
+            if (track.number == battleRadioTrackNumbers[index]) return battleRadioDiagnosticStart + index;
+        }
+    }
+    if (track.archive == "XA2D_18.DAT") {
+        for (size_t index = 0; index < bossRadioTrackNumbers.size(); ++index) {
+            if (track.number == bossRadioTrackNumbers[index]) return bossRadioDiagnosticStart + index;
+        }
+    }
+    if (IsRollBathTrack(track)) return rollBathDiagnosticTrack;
+    if (track.archive == "XA26_18.DAT" && IsGameplayRadioTrack(track.number)) {
+        return 160 + track.number;
+    }
     int index = SubtitleArchiveIndex(track.archive.c_str());
     return index >= 0 ? static_cast<unsigned>(index) * 32 + track.number : 0;
 }
@@ -72,12 +130,60 @@ struct CaptionScript {
     std::vector<VoiceBinding> voices;
 };
 
+struct CaptionContinuation {
+    CaptionScript script;
+    uint32_t registration = 0;
+    std::array<unsigned char, 5> registrationBytes = {};
+    uint32_t callback = 0;
+    std::array<unsigned char, 16> callbackBytes = {};
+    uint32_t scriptPush = 0;
+    std::array<unsigned char, 5> scriptPushBytes = {};
+    uint32_t contextPush = 0;
+    std::array<unsigned char, 5> contextPushBytes = {};
+};
+
 struct CaptionScene {
     uint8_t type = 0;
     uint32_t wrapper = 0;
     std::array<unsigned char, 16> wrapperBytes = {};
     std::vector<VoiceBinding> voices;
+    std::vector<CaptionContinuation> continuations;
 };
+
+struct BossRadioBinding {
+    std::array<unsigned char, 16> callBytes = {};
+    std::array<unsigned char, 16> wrapperBytes = {};
+    std::array<uint32_t, 3> dispatchWords = {};
+    CaptionContinuation continuation;
+};
+
+struct EndingSongBinding {
+    BossRadioBinding controller;
+    std::array<unsigned char, 16> playBytes = {};
+    std::array<unsigned char, 16> creditsCallBytes = {};
+    std::array<unsigned char, 16> creditsCallbackBytes = {};
+    std::array<std::array<unsigned char, 64>, 3> audioProbes = {};
+};
+
+static constexpr uint32_t endingSongBytes = 3502208;
+static constexpr std::array<uint32_t, 3> endingSongProbeOffsets = {0, 1751104, 3502144};
+
+struct BattleRadioControllerSpec {
+    uint8_t type;
+    uint32_t wrapper;
+    uint32_t dispatch;
+    std::array<uint32_t, 3> dispatchWords;
+    uint32_t scriptStart;
+    uint32_t scriptEnd;
+    uint32_t registration;
+    uint32_t scriptPush;
+    uint32_t contextPush;
+};
+
+static constexpr std::array<BattleRadioControllerSpec, 2> battleRadioControllers = {{
+    {0x59, 0x533dc0, 0x8aa27c, {0x533de0, 0x533fc0, 0x534000}, 0x8a9f80, 0x8aa060, 0x533f31, 0x533f1c, 0x533f21},
+    {0x5a, 0x535a40, 0x8aa4c0, {0x535a60, 0x535b80, 0x535be0}, 0x8aa490, 0x8aa4b8, 0x535ae1, 0x535ad2, 0x535ad7}
+}};
 
 struct SceneContext {
     bool readable = false;
@@ -90,9 +196,80 @@ struct SceneContext {
 
 enum class CaptionGate { Allowed, Unknown, OutsideScript, NativeMessage };
 
+static CaptionGate EvaluateEndingSong(const SceneContext& context) {
+    if (!context.readable) return CaptionGate::Unknown;
+    if (context.type != 0x6e || (context.flags != 1 && context.flags != 5) || context.script != 0x8acc80) {
+        return CaptionGate::OutsideScript;
+    }
+    for (uint32_t flags : context.messageFlags) {
+        if (flags & 0x8080) return CaptionGate::NativeMessage;
+    }
+    return CaptionGate::Allowed;
+}
+
 static constexpr uintptr_t openingVoiceCaller = 0x512eb3;
 static constexpr uint32_t openingScriptStart = 0x89b790;
 static constexpr uint32_t openingScriptEnd = 0x89b890;
+static constexpr uint32_t gameplayRadioScriptStart = 0x8a48f0;
+static constexpr uint32_t gameplayRadioScriptEnd = 0x8a4928;
+static constexpr uint32_t gameplayRadioIdleScriptStart = 0x88b788;
+static constexpr uint32_t gameplayRadioIdleScriptEnd = 0x88b7a0;
+static constexpr uint32_t gameplayRadioPlaybackBits = 0x3000 | 0x1040;
+static constexpr uint32_t rollBathScriptStart = 0x8ad1e8;
+static constexpr uint32_t rollBathScriptEnd = 0x8ad200;
+static constexpr uint32_t bossRadioScriptStart = 0x8a86b0;
+static constexpr uint32_t bossRadioScriptEnd = 0x8a86b8;
+
+static CaptionGate EvaluateBattleRadio(const SceneContext& context, unsigned number) {
+    if (!context.readable) return CaptionGate::Unknown;
+    if (!IsBattleRadioTrack(number) || context.descriptor != 0x90924c) return CaptionGate::OutsideScript;
+    const bool transition = context.type == 0x5a;
+    if (transition && number != 25) return CaptionGate::OutsideScript;
+    const auto& controller = battleRadioControllers[transition ? 1 : 0];
+    if (context.type != controller.type) return CaptionGate::OutsideScript;
+    if (transition) {
+        if ((context.flags != 1 && context.flags != 5) || (context.script &&
+            (context.script < controller.scriptStart || context.script >= controller.scriptEnd ||
+                (context.script - controller.scriptStart) % 8))) return CaptionGate::OutsideScript;
+    } else if (context.flags != 0 || context.script < controller.scriptStart || context.script > controller.scriptEnd ||
+        (context.script - controller.scriptStart) % 8) return CaptionGate::OutsideScript;
+    for (size_t channel = 0; channel < 4; ++channel) {
+        if (context.messageFlags[channel] & 0x8080) return CaptionGate::NativeMessage;
+    }
+    const uint32_t mode = context.messageFlags[4] & ~gameplayRadioPlaybackBits;
+    if (context.messageFlags[4] != 0 && mode != (0x300c3u & ~gameplayRadioPlaybackBits)) return CaptionGate::NativeMessage;
+    return CaptionGate::Allowed;
+}
+
+static CaptionGate EvaluateBossRadio(const SceneContext& context) {
+    if (!context.readable) return CaptionGate::Unknown;
+    if (context.flags != 0 || context.type != 0x4a || context.descriptor != 0x8f2064 ||
+        (context.script != bossRadioScriptStart && context.script != bossRadioScriptEnd)) return CaptionGate::OutsideScript;
+    for (size_t channel = 0; channel < 4; ++channel) {
+        if (context.messageFlags[channel] & 0x8080) return CaptionGate::NativeMessage;
+    }
+    const uint32_t mode = context.messageFlags[4] & ~gameplayRadioPlaybackBits;
+    if (context.messageFlags[4] != 0 && mode != (0x300c3u & ~gameplayRadioPlaybackBits)) return CaptionGate::NativeMessage;
+    return CaptionGate::Allowed;
+}
+
+static CaptionGate EvaluateGameplayRadio(const SceneContext& context, unsigned number) {
+    if (!context.readable) return CaptionGate::Unknown;
+    if (!IsGameplayRadioTrack(number) || context.flags != 0 ||
+        context.descriptor != GameplayRadioDescriptor(number)) return CaptionGate::OutsideScript;
+    if (IsLateGameplayRadioTrack(number)) {
+        if (context.type != 0 || context.script != gameplayRadioIdleScriptEnd) return CaptionGate::OutsideScript;
+    } else if (context.type != 0x2d ||
+        context.script < gameplayRadioScriptStart || context.script > gameplayRadioScriptEnd ||
+        (context.script - gameplayRadioScriptStart) % 8) return CaptionGate::OutsideScript;
+    const size_t radioChannel = GameplayRadioMessageChannel(number);
+    for (size_t channel = 0; channel < context.messageFlags.size(); ++channel) {
+        if (channel != radioChannel && (context.messageFlags[channel] & 0x8080)) return CaptionGate::NativeMessage;
+    }
+    const uint32_t radioMode = context.messageFlags[radioChannel] & ~gameplayRadioPlaybackBits;
+    if (context.messageFlags[radioChannel] != 0 && radioMode != (0x300c3u & ~gameplayRadioPlaybackBits)) return CaptionGate::NativeMessage;
+    return CaptionGate::Allowed;
+}
 
 static CaptionGate EvaluateContext(const SceneContext& context, const CaptionScript& script) {
     if (!context.readable) return CaptionGate::Unknown;
@@ -104,10 +281,35 @@ static CaptionGate EvaluateContext(const SceneContext& context, const CaptionScr
     return CaptionGate::Allowed;
 }
 
-static CaptionGate EvaluateContext(const SceneContext& context, const CaptionScript* script, const CaptionScene* scene) {
-    if (script) return EvaluateContext(context, *script);
+static CaptionGate EvaluateContext(const SceneContext& context, const CaptionScript* script, const CaptionScene* scene,
+    const SubtitleTrack* scopedTrack = nullptr) {
+    if (scopedTrack && IsEndingSongTrack(*scopedTrack)) return EvaluateEndingSong(context);
+    if (scopedTrack && IsRollBathTrack(*scopedTrack)) {
+        if (!context.readable) return CaptionGate::Unknown;
+        if (context.descriptor != 0x8d4acc || context.type != 0x70 ||
+            (context.flags != 1 && context.flags != 5) || !script ||
+            script->start != rollBathScriptStart || script->end != rollBathScriptEnd) return CaptionGate::OutsideScript;
+    } else if (scopedTrack && scopedTrack->archive == "XA26_18.DAT") {
+        return EvaluateGameplayRadio(context, scopedTrack->number);
+    } else if (scopedTrack && scopedTrack->archive == "XA2D_18.DAT") {
+        return IsBossRadioTrack(scopedTrack->number) ? EvaluateBossRadio(context) : CaptionGate::OutsideScript;
+    } else if (scopedTrack && scopedTrack->archive == "XA40_18.DAT") {
+        return EvaluateBattleRadio(context, scopedTrack->number);
+    }
+    if (script) {
+        if (scene && context.readable && context.type != scene->type) return CaptionGate::OutsideScript;
+        return EvaluateContext(context, *script);
+    }
     if (!scene || !context.readable) return CaptionGate::Unknown;
-    if (!(context.flags & 1) || context.type != scene->type || context.script) return CaptionGate::OutsideScript;
+    if (!(context.flags & 1) || context.type != scene->type) return CaptionGate::OutsideScript;
+    if (context.script) {
+        for (const auto& continuation : scene->continuations) {
+            if (context.script >= continuation.script.start && context.script < continuation.script.end) {
+                return EvaluateContext(context, continuation.script);
+            }
+        }
+        return CaptionGate::OutsideScript;
+    }
     for (uint32_t flags : context.messageFlags) {
         if (flags & 0x8080) return CaptionGate::NativeMessage;
     }
@@ -160,8 +362,8 @@ static CreateDrawExFunction originalCreateDrawEx;
 static ULONGLONG firstFrame;
 static unsigned drawnFrames;
 static unsigned presentedFrames;
-static std::array<bool, 163> savedComparison = {};
-static std::array<bool, 163> savedWindow = {};
+static std::array<bool, maximumDiagnosticTrack + 3> savedComparison = {};
+static std::array<bool, maximumDiagnosticTrack + 3> savedWindow = {};
 static ULONGLONG lastCaptureAttempt;
 static int reportedFontCue = -1;
 static unsigned reportedFontTrack;
@@ -170,6 +372,8 @@ static thread_local int renderedCue = -1;
 static thread_local unsigned renderedTrack;
 using LoadVoiceFunction = void(__cdecl*)(unsigned);
 static LoadVoiceFunction originalLoadVoice;
+using PlayStreamFunction = uintptr_t(__cdecl*)(unsigned);
+static PlayStreamFunction originalPlayStream;
 static IDirectSoundBuffer* observedVoice;
 static ULONGLONG lastVoiceSample;
 static ULONGLONG voiceStartedAt;
@@ -179,21 +383,67 @@ static int voiceSlot = -1;
 static int activeCue = -1;
 static HANDLE voiceTimer;
 static std::vector<SubtitleTrack> subtitleTracks;
+static std::vector<SubtitleTrack> gameplayRadioTracks;
+static std::vector<SubtitleTrack> bossRadioTracks;
+static BossRadioBinding bossRadioBinding;
+static std::vector<SubtitleTrack> battleRadioTracks;
+static std::array<BossRadioBinding, 2> battleRadioBindings;
+static std::vector<SubtitleTrack> rollBathTracks;
+static std::vector<SubtitleTrack> endingSongTracks;
+static EndingSongBinding endingSongBinding;
+static std::array<unsigned char, 16> gameplayRadioCallBytes = {};
+static std::array<unsigned char, 32> gameplayRadioIdleBytes = {};
 static std::vector<CaptionScript> captionScripts;
 static std::vector<CaptionScene> captionScenes;
 static const SubtitleTrack* activeTrack;
 static const CaptionScript* activeScript;
 static const CaptionScene* activeScene;
+static bool activeGameplayRadio = false;
 
 struct CaptionSelection {
     const SubtitleTrack* track = nullptr;
     const CaptionScript* script = nullptr;
     const VoiceBinding* voice = nullptr;
     const CaptionScene* scene = nullptr;
+    bool gameplayRadio = false;
 };
 
 static CaptionSelection SelectCaption(uintptr_t caller, unsigned request, const char* archive,
     unsigned zeroBasedTrack, const SceneContext& context) {
+    if (caller == 0x55a6da && archive && !_stricmp(archive, "XA40_18.DAT") &&
+        IsBattleRadioTrack(zeroBasedTrack + 1) && request == (0x8000u | zeroBasedTrack) &&
+        context.messageFlags[4] == 0x300c3 && (context.type != 0x5a || (context.flags == 5 && !context.script)) &&
+        EvaluateBattleRadio(context, zeroBasedTrack + 1) == CaptionGate::Allowed) {
+        for (const auto& track : battleRadioTracks) {
+            if (track.number == zeroBasedTrack + 1) return {&track, nullptr, nullptr, nullptr, true};
+        }
+    }
+    if (caller == 0x55a6da && archive && !_stricmp(archive, "XA2D_18.DAT") &&
+        IsBossRadioTrack(zeroBasedTrack + 1) && request == (0x8000u | zeroBasedTrack) &&
+        context.messageFlags[4] == 0x300c3 && EvaluateBossRadio(context) == CaptionGate::Allowed) {
+        for (const auto& track : bossRadioTracks) {
+            if (track.number == zeroBasedTrack + 1) return {&track, nullptr, nullptr, nullptr, true};
+        }
+    }
+    if (!rollBathTracks.empty() && caller == 0x53d35c && request == 0xff03 && zeroBasedTrack == 3 &&
+        archive && !_stricmp(archive, "XACOM_18.DAT") && context.flags == 5 && context.script == rollBathScriptStart) {
+        const auto& track = rollBathTracks.front();
+        for (const auto& script : captionScripts) {
+            if (EvaluateContext(context, &script, nullptr, &track) != CaptionGate::Allowed) continue;
+            for (const auto& voice : script.voices) {
+                if (voice.caller == caller && voice.callback == 0x53d320) return {&track, &script, &voice};
+            }
+        }
+    }
+    if (caller == 0x55a6da && archive && !_stricmp(archive, "XA26_18.DAT") &&
+        IsGameplayRadioTrack(zeroBasedTrack + 1) &&
+        request == (0x8000u | zeroBasedTrack) &&
+        context.messageFlags[GameplayRadioMessageChannel(zeroBasedTrack + 1)] == 0x300c3 &&
+        EvaluateGameplayRadio(context, zeroBasedTrack + 1) == CaptionGate::Allowed) {
+        for (const auto& track : gameplayRadioTracks) {
+            if (track.number == zeroBasedTrack + 1) return {&track, nullptr, nullptr, nullptr, true};
+        }
+    }
     int archiveIndex = SubtitleArchiveIndex(archive);
     if (request >= 0x7f00 || archiveIndex < 0 || zeroBasedTrack >= archiveTrackLimits[archiveIndex]) return {};
     for (const auto& track : subtitleTracks) {
@@ -208,6 +458,12 @@ static CaptionSelection SelectCaption(uintptr_t caller, unsigned request, const 
             if (EvaluateContext(context, nullptr, &scene) != CaptionGate::Allowed) continue;
             for (const auto& voice : scene.voices) {
                 if (voice.caller == caller) return {&track, nullptr, &voice, &scene};
+            }
+            for (const auto& continuation : scene.continuations) {
+                if (EvaluateContext(context, continuation.script) != CaptionGate::Allowed) continue;
+                for (const auto& voice : continuation.script.voices) {
+                    if (voice.caller == caller) return {&track, &continuation.script, &voice, &scene};
+                }
             }
         }
     }
@@ -316,7 +572,8 @@ static bool ReadSubtitleJson(const std::wstring& filename, nlohmann::json& docum
     return !document.is_discarded() && document.is_object();
 }
 
-static bool ParseSubtitleTrack(nlohmann::json& document, unsigned number, SubtitleTrack& track) {
+static bool ParseSubtitleTrack(nlohmann::json& document, unsigned number, SubtitleTrack& track,
+    SubtitleTrackKind kind = SubtitleTrackKind::Cinematic) {
     if (!document.is_object() || document["version"] != 1 ||
         !document["archive"].is_string() || document["track"] != number ||
         document["language"] != "zh-Hant" ||
@@ -324,7 +581,23 @@ static bool ParseSubtitleTrack(nlohmann::json& document, unsigned number, Subtit
         !document["cues"].is_array() || document["cues"].empty() || document["cues"].size() > 128) return false;
     std::string archive = document["archive"].get<std::string>();
     int archiveIndex = SubtitleArchiveIndex(archive.c_str());
-    if (archiveIndex < 0 || archive != subtitleArchives[archiveIndex] ||
+    if (kind == SubtitleTrackKind::GameplayRadio) {
+        if (archive != "XA26_18.DAT" || !IsGameplayRadioTrack(number) ||
+            document["duration_ms"] > 15000 || document["cues"].size() > 16) return false;
+    } else if (kind == SubtitleTrackKind::BossRadio) {
+        const size_t expectedCues = number == 33 || number == 34 ? 2 : 1;
+        if (archive != "XA2D_18.DAT" || !IsBossRadioTrack(number) || document["duration_ms"] == 0 ||
+            document["duration_ms"] > 15000 || document["cues"].size() != expectedCues) return false;
+    } else if (kind == SubtitleTrackKind::BattleRadio) {
+        if (archive != "XA40_18.DAT" || !IsBattleRadioTrack(number) || document["duration_ms"] == 0 ||
+            document["duration_ms"] > 5000 || document["cues"].size() != 1) return false;
+    } else if (kind == SubtitleTrackKind::RollBath) {
+        if (archive != "XACOM_18.DAT" || number != 4 || document["duration_ms"] == 0 ||
+            document["duration_ms"] > 5000 || document["cues"].size() != 1) return false;
+    } else if (kind == SubtitleTrackKind::EndingSong) {
+        if (archive != "STAFF.DAT" || number != 1 || document["duration_ms"] != 218888 ||
+            document["cues"].size() != 16) return false;
+    } else if (archiveIndex < 0 || archive != subtitleArchives[archiveIndex] ||
         !number || number > archiveTrackLimits[archiveIndex]) return false;
     uint32_t duration = document["duration_ms"].get<uint32_t>();
     std::vector<SubtitleCue> parsed;
@@ -360,7 +633,8 @@ static bool Unsigned32(const nlohmann::json& value) {
     return value.is_number_unsigned() && value <= 0xffffffffu;
 }
 
-static bool ParseSignature(const nlohmann::json& value, std::array<unsigned char, 16>& bytes) {
+template<size_t Size>
+static bool ParseSignature(const nlohmann::json& value, std::array<unsigned char, Size>& bytes) {
     if (!value.is_array() || value.size() != bytes.size()) return false;
     for (size_t index = 0; index < bytes.size(); ++index) {
         if (!value[index].is_number_unsigned() || value[index] > 255) return false;
@@ -373,7 +647,7 @@ static bool ParseVoiceBinding(nlohmann::json& source, VoiceBinding& voice) {
     if (!source.is_object() || !Unsigned32(source["caller"]) || !Unsigned32(source["callback"])) return false;
     voice.caller = source["caller"].get<uint32_t>();
     voice.callback = source["callback"].get<uint32_t>();
-    if (voice.caller < 0x512cb0 || voice.caller >= 0x53ebc0 || voice.callback < 0x512ca0 ||
+    if (voice.caller < 0x512cb0 || voice.caller >= cinematicCallbackEnd || voice.callback < 0x512ca0 ||
         voice.callback >= voice.caller || !ParseSignature(source["call_bytes"], voice.callBytes) ||
         !ParseSignature(source["callback_bytes"], voice.callbackBytes) || voice.callBytes[11] != 0xe8) return false;
     uint32_t displacement = 0;
@@ -386,13 +660,65 @@ static bool ParseVoiceBinding(nlohmann::json& source, VoiceBinding& voice) {
         bool member = false;
         for (size_t index = 0; index < voice.dispatchWords.size(); ++index) {
             const auto& word = source["dispatch_words"][index];
-            if (!Unsigned32(word) || word < 0x512ca0 || word >= 0x53ebc0) return false;
+            if (!Unsigned32(word) || word < 0x512ca0 || word >= cinematicCallbackEnd) return false;
             voice.dispatchWords[index] = word.get<uint32_t>();
             member = member || voice.dispatchWords[index] == voice.callback;
         }
         if (!member) return false;
     }
     return true;
+}
+
+static bool ParseContinuation(nlohmann::json& source, CaptionContinuation& continuation) {
+    if (!source.is_object() || !Unsigned32(source["start"]) || !Unsigned32(source["end"]) ||
+        !Unsigned32(source["registration"]) || !Unsigned32(source["callback"]) ||
+        !Unsigned32(source["script_push"]) || !Unsigned32(source["context_push"]) || !source["words"].is_array() ||
+        !ParseSignature(source["registration_bytes"], continuation.registrationBytes) ||
+        !ParseSignature(source["callback_bytes"], continuation.callbackBytes) ||
+        !ParseSignature(source["script_push_bytes"], continuation.scriptPushBytes) ||
+        !ParseSignature(source["context_push_bytes"], continuation.contextPushBytes)) return false;
+    auto& script = continuation.script;
+    script.start = source["start"].get<uint32_t>();
+    script.end = source["end"].get<uint32_t>();
+    continuation.registration = source["registration"].get<uint32_t>();
+    continuation.callback = source["callback"].get<uint32_t>();
+    continuation.scriptPush = source["script_push"].get<uint32_t>();
+    continuation.contextPush = source["context_push"].get<uint32_t>();
+    if (script.start < 0x89b000 || script.start % 4 || script.end >= 0x8b0000 || script.end <= script.start ||
+        script.end - script.start > 8192 || (script.end - script.start) % 8 ||
+        source["words"].size() != (script.end - script.start) / 4 ||
+        continuation.callback < 0x512ca0 || continuation.callback >= cinematicCallbackEnd ||
+        continuation.registration <= continuation.callback || continuation.registration >= cinematicCallbackEnd ||
+        continuation.registration - continuation.callback > 0x4000 ||
+        continuation.scriptPush < continuation.callback || continuation.scriptPush > continuation.registration - 15 ||
+        continuation.contextPush < continuation.scriptPush + 5 || continuation.contextPush > continuation.registration - 10) return false;
+    for (const auto& word : source["words"]) {
+        if (!Unsigned32(word)) return false;
+        script.words.push_back(word.get<uint32_t>());
+    }
+    for (size_t index = 1; index < script.words.size(); index += 2) {
+        if (script.words[index] && (script.words[index] < 0x400000 || script.words[index] >= 0x830000)) return false;
+    }
+    if (source.contains("voices")) {
+        if (!source["voices"].is_array() || source["voices"].empty() || source["voices"].size() > 128) return false;
+        for (auto& entry : source["voices"]) {
+            VoiceBinding voice;
+            if (!ParseVoiceBinding(entry, voice) || voice.dispatch) return false;
+            bool member = false;
+            for (size_t index = 1; index < script.words.size(); index += 2) member = member || script.words[index] == voice.callback;
+            if (!member) return false;
+            for (const auto& existing : script.voices) if (existing.caller == voice.caller) return false;
+            script.voices.push_back(voice);
+        }
+    }
+    if (continuation.scriptPushBytes[0] != 0x68 || continuation.contextPushBytes[0] != 0x68 ||
+        continuation.registrationBytes[0] != 0xe8) return false;
+    uint32_t target = 0, context = 0, displacement = 0;
+    std::memcpy(&target, continuation.scriptPushBytes.data() + 1, sizeof(target));
+    std::memcpy(&context, continuation.contextPushBytes.data() + 1, sizeof(context));
+    std::memcpy(&displacement, continuation.registrationBytes.data() + 1, sizeof(displacement));
+    return target == script.start && context >= 0x89b000 && context < 0x8b0000 &&
+        continuation.registration + displacement == 0x511630;
 }
 
 static bool LoadSubtitleCatalog() {
@@ -408,6 +734,16 @@ static bool LoadSubtitleCatalog() {
         !catalog["scripts"].is_array() || catalog["scripts"].empty() || catalog["scripts"].size() > 128 ||
         !catalog["scenes"].is_array() || catalog["scenes"].size() > 256) return false;
     std::vector<SubtitleTrack> tracks;
+    std::vector<SubtitleTrack> radioTracks;
+    std::vector<SubtitleTrack> bossTracks;
+    BossRadioBinding bossBinding;
+    std::vector<SubtitleTrack> battleTracks;
+    std::array<BossRadioBinding, 2> battleBindings;
+    std::vector<SubtitleTrack> bathTracks;
+    std::vector<SubtitleTrack> endingTracks;
+    EndingSongBinding endingBinding;
+    std::array<unsigned char, 16> radioCallBytes = {};
+    std::array<unsigned char, 32> radioIdleBytes = {};
     std::vector<CaptionScript> scripts;
     std::vector<CaptionScene> scenes;
     tracks.push_back(std::move(opening));
@@ -456,7 +792,7 @@ static bool LoadSubtitleCatalog() {
     }
     for (auto& entry : catalog["scenes"]) {
         if (!entry.is_object() || !Unsigned32(entry["type"]) || entry["type"] > 255 ||
-            !Unsigned32(entry["wrapper"]) || entry["wrapper"] < 0x512b80 || entry["wrapper"] >= 0x53ebc0 ||
+            !Unsigned32(entry["wrapper"]) || entry["wrapper"] < 0x512b80 || entry["wrapper"] >= cinematicCallbackEnd ||
             !entry["voices"].is_array() || entry["voices"].empty() || entry["voices"].size() > 128) return false;
         CaptionScene scene;
         scene.type = entry["type"].get<uint8_t>();
@@ -469,42 +805,344 @@ static bool LoadSubtitleCatalog() {
             for (const auto& existing : scene.voices) if (existing.caller == voice.caller) return false;
             scene.voices.push_back(voice);
         }
+        if (entry.contains("continuations")) {
+            if (!entry["continuations"].is_array() || entry["continuations"].empty() ||
+                entry["continuations"].size() > 16) return false;
+            for (auto& source : entry["continuations"]) {
+                CaptionContinuation continuation;
+                if (!ParseContinuation(source, continuation)) return false;
+                bool owned = false;
+                for (const auto& voice : scene.voices) {
+                    for (uint32_t callback : voice.dispatchWords) owned = owned || callback == continuation.callback;
+                }
+                if (!owned) return false;
+                for (const auto& existing : scene.continuations) {
+                    if (continuation.script.start < existing.script.end &&
+                        existing.script.start < continuation.script.end) return false;
+                }
+                scene.continuations.push_back(std::move(continuation));
+            }
+        }
         scenes.push_back(std::move(scene));
     }
+    if (catalog.contains("gameplay_radio")) {
+        auto& radio = catalog["gameplay_radio"];
+        if (!radio.is_object() || radio["version"] != 1 || radio["scope"] != "xa26-lava-radio-v1" ||
+            radio["caller"] != 0x55a6da || !ParseSignature(radio["call_bytes"], radioCallBytes) ||
+            radioCallBytes[11] != 0xe8 || !radio["tracks"].is_array() ||
+            (radio["tracks"].size() != 3 && radio["tracks"].size() != 5 && radio["tracks"].size() != 7 &&
+                radio["tracks"].size() != gameplayRadioTrackNumbers.size())) return false;
+        if (radio["tracks"].size() >= 7) {
+            if (!ParseSignature(radio["idle_script_bytes"], radioIdleBytes)) return false;
+            for (size_t index = 24; index < radioIdleBytes.size(); ++index) {
+                if (radioIdleBytes[index] != (index == 24 ? 255 : 0)) return false;
+            }
+        } else if (radio.contains("idle_script_bytes")) return false;
+        uint32_t displacement = 0;
+        std::memcpy(&displacement, radioCallBytes.data() + 12, sizeof(displacement));
+        if (0x55a6da + displacement != 0x600ec0) return false;
+        for (size_t index = 0; index < radio["tracks"].size(); ++index) {
+            SubtitleTrack track;
+            if (!ParseSubtitleTrack(radio["tracks"][index], gameplayRadioTrackNumbers[index], track,
+                SubtitleTrackKind::GameplayRadio)) return false;
+            radioTracks.push_back(std::move(track));
+        }
+    }
+    if (catalog.contains("boss_radio")) {
+        auto& radio = catalog["boss_radio"];
+        if (!radio.is_object() || radio["version"] != 1 || radio["scope"] != "xa2d-boss-radio-v1" ||
+            radio["caller"] != 0x55a6da || radio["descriptor"] != 0x8f2064 || radio["message_channel"] != 4 ||
+            !ParseSignature(radio["call_bytes"], bossBinding.callBytes) || bossBinding.callBytes[11] != 0xe8 ||
+            !radio["tracks"].is_array() ||
+            (radio["tracks"].size() != 4 && radio["tracks"].size() != bossRadioTrackNumbers.size())) return false;
+        uint32_t displacement = 0;
+        std::memcpy(&displacement, bossBinding.callBytes.data() + 12, sizeof(displacement));
+        if (0x55a6da + displacement != 0x600ec0) return false;
+        auto& controller = radio["controller"];
+        if (!controller.is_object() || controller["type"] != 0x4a || controller["wrapper"] != 0x5301d0 ||
+            controller["dispatch"] != 0x8a86c0 || !ParseSignature(controller["wrapper_bytes"], bossBinding.wrapperBytes) ||
+            !controller["dispatch_words"].is_array() || controller["dispatch_words"].size() != 3 ||
+            !ParseContinuation(controller["continuation"], bossBinding.continuation)) return false;
+        for (size_t index = 0; index < bossBinding.dispatchWords.size(); ++index) {
+            const auto& word = controller["dispatch_words"][index];
+            if (!Unsigned32(word) || word < 0x512ca0 || word >= 0x53ebc0) return false;
+            bossBinding.dispatchWords[index] = word.get<uint32_t>();
+        }
+        const auto& continuation = bossBinding.continuation;
+        if (bossBinding.dispatchWords[0] != 0x5301f0 || continuation.callback != 0x5301f0 ||
+            continuation.registration != 0x530213 || continuation.scriptPush != 0x530204 ||
+            continuation.contextPush != 0x530209 || continuation.script.start != bossRadioScriptStart ||
+            continuation.script.end != bossRadioScriptEnd || !continuation.script.voices.empty() ||
+            continuation.script.words != std::vector<uint32_t>{0x1c20000, 0x530300}) return false;
+        for (size_t index = 0; index < radio["tracks"].size(); ++index) {
+            SubtitleTrack track;
+            if (!ParseSubtitleTrack(radio["tracks"][index], bossRadioTrackNumbers[index], track,
+                SubtitleTrackKind::BossRadio)) return false;
+            bossTracks.push_back(std::move(track));
+        }
+    }
+    if (catalog.contains("battle_radio")) {
+        auto& radio = catalog["battle_radio"];
+        std::array<unsigned char, 16> callBytes = {};
+        if (!radio.is_object() || radio["version"] != 1 || radio["scope"] != "xa40-battle-radio-v1" ||
+            radio["caller"] != 0x55a6da || radio["descriptor"] != 0x90924c || radio["message_channel"] != 4 ||
+            !ParseSignature(radio["call_bytes"], callBytes) || callBytes[11] != 0xe8 ||
+            !radio["tracks"].is_array() || (radio["tracks"].size() != 3 && radio["tracks"].size() != battleRadioTrackNumbers.size()) ||
+            !radio["controllers"].is_array() || radio["controllers"].size() != battleRadioControllers.size() ||
+            !radio["provisional_tracks"].is_array() || radio["provisional_tracks"].size() != (radio["tracks"].size() == 3 ? 1 : 2) ||
+            radio["provisional_tracks"][0] != 29 ||
+            (radio["tracks"].size() != 3 && radio["provisional_tracks"][1] != 28)) return false;
+        uint32_t displacement = 0;
+        std::memcpy(&displacement, callBytes.data() + 12, sizeof(displacement));
+        if (0x55a6da + displacement != 0x600ec0) return false;
+        for (size_t index = 0; index < battleRadioControllers.size(); ++index) {
+            const auto& expected = battleRadioControllers[index];
+            auto& controller = radio["controllers"][index];
+            auto& binding = battleBindings[index];
+            binding.callBytes = callBytes;
+            if (!controller.is_object() || controller["type"] != expected.type || controller["wrapper"] != expected.wrapper ||
+                controller["dispatch"] != expected.dispatch || !ParseSignature(controller["wrapper_bytes"], binding.wrapperBytes) ||
+                !controller["dispatch_words"].is_array() || controller["dispatch_words"].size() != 3 ||
+                !ParseContinuation(controller["continuation"], binding.continuation)) return false;
+            for (size_t word = 0; word < binding.dispatchWords.size(); ++word) {
+                if (controller["dispatch_words"][word] != expected.dispatchWords[word]) return false;
+            }
+            binding.dispatchWords = expected.dispatchWords;
+            const auto& continuation = binding.continuation;
+            if (continuation.callback != expected.dispatchWords[0] || continuation.registration != expected.registration ||
+                continuation.scriptPush != expected.scriptPush || continuation.contextPush != expected.contextPush ||
+                continuation.script.start != expected.scriptStart || continuation.script.end != expected.scriptEnd ||
+                !continuation.script.voices.empty()) return false;
+        }
+        for (size_t index = 0; index < radio["tracks"].size(); ++index) {
+            SubtitleTrack track;
+            if (!ParseSubtitleTrack(radio["tracks"][index], battleRadioTrackNumbers[index], track,
+                SubtitleTrackKind::BattleRadio)) return false;
+            if ((track.number == 29 || track.number == 28) &&
+                radio["tracks"][index]["translation_status"] != "user-approved-provisional") return false;
+            battleTracks.push_back(std::move(track));
+        }
+    }
+    if (catalog.contains("roll_bath")) {
+        auto& event = catalog["roll_bath"];
+        if (!event.is_object() || event["version"] != 1 || event["scope"] != "roll-bath-v1" ||
+            event["caller"] != 0x53d35c || event["request"] != 0xff03 || event["descriptor"] != 0x8d4acc ||
+            event["controller_type"] != 0x70 || event["script_start"] != rollBathScriptStart ||
+            event["script_end"] != rollBathScriptEnd) return false;
+        SubtitleTrack track;
+        if (!ParseSubtitleTrack(event["track"], 4, track, SubtitleTrackKind::RollBath)) return false;
+        bool bound = false;
+        for (const auto& script : scripts) {
+            if (script.start != rollBathScriptStart || script.end != rollBathScriptEnd) continue;
+            for (const auto& voice : script.voices) {
+                const std::array<unsigned char, 5> request = {0x68, 0x03, 0xff, 0x00, 0x00};
+                if (voice.caller == 0x53d35c && voice.callback == 0x53d320 &&
+                    std::equal(request.begin(), request.end(), voice.callBytes.begin() + 6)) bound = true;
+            }
+        }
+        if (!bound) return false;
+        bathTracks.push_back(std::move(track));
+    }
+    if (catalog.contains("ending_song")) {
+        auto& song = catalog["ending_song"];
+        auto& binding = endingBinding.controller;
+        if (!song.is_object() || song["version"] != 1 || song["scope"] != "staff-ending-lyrics-v1" ||
+            song["caller"] != 0x40dcdf || song["play_function"] != 0x40ae40 || song["credits_caller"] != 0x53c074 ||
+            song["resource_bytes"] != endingSongBytes || !ParseSignature(song["call_bytes"], binding.callBytes) ||
+            !ParseSignature(song["play_bytes"], endingBinding.playBytes) ||
+            !ParseSignature(song["credits_call_bytes"], endingBinding.creditsCallBytes) ||
+            !ParseSignature(song["credits_callback_bytes"], endingBinding.creditsCallbackBytes) ||
+            !song["audio_probes"].is_array() || song["audio_probes"].size() != 3) return false;
+        uint32_t playDisplacement = 0, creditsDisplacement = 0;
+        std::memcpy(&playDisplacement, binding.callBytes.data() + 12, sizeof(playDisplacement));
+        std::memcpy(&creditsDisplacement, endingBinding.creditsCallBytes.data() + 12, sizeof(creditsDisplacement));
+        if (binding.callBytes[11] != 0xe8 || 0x40dcdf + playDisplacement != 0x40ae40 ||
+            endingBinding.creditsCallBytes[11] != 0xe8 || 0x53c074 + creditsDisplacement != 0x40dc90) return false;
+        for (size_t index = 0; index < endingSongProbeOffsets.size(); ++index) {
+            const auto& probe = song["audio_probes"][index];
+            if (probe["offset"] != endingSongProbeOffsets[index] || !ParseSignature(probe["bytes"], endingBinding.audioProbes[index])) return false;
+        }
+        auto& controller = song["controller"];
+        if (!controller.is_object() || controller["type"] != 0x6e || controller["wrapper"] != 0x53bd40 ||
+            controller["dispatch"] != 0x8acc90 || !ParseSignature(controller["wrapper_bytes"], binding.wrapperBytes) ||
+            !controller["dispatch_words"].is_array() || controller["dispatch_words"].size() != 3 ||
+            !ParseContinuation(controller["continuation"], binding.continuation)) return false;
+        const std::array<uint32_t, 3> expectedDispatch = {0x53bd60, 0x53bea0, 0x53bf20};
+        for (size_t index = 0; index < expectedDispatch.size(); ++index) {
+            if (controller["dispatch_words"][index] != expectedDispatch[index]) return false;
+        }
+        binding.dispatchWords = expectedDispatch;
+        const auto& continuation = binding.continuation;
+        if (continuation.callback != 0x53bd60 || continuation.registration != 0x53bdee ||
+            continuation.scriptPush != 0x53bddf || continuation.contextPush != 0x53bde4 ||
+            continuation.script.start != 0x8acc80 || continuation.script.end != 0x8acc88 ||
+            continuation.script.words != std::vector<uint32_t>{0xffff0000, 0x53c020} ||
+            !continuation.script.voices.empty()) return false;
+        SubtitleTrack track;
+        if (!ParseSubtitleTrack(song["track"], 1, track, SubtitleTrackKind::EndingSong)) return false;
+        endingTracks.push_back(std::move(track));
+    }
     subtitleTracks = std::move(tracks);
+    gameplayRadioTracks = std::move(radioTracks);
+    bossRadioTracks = std::move(bossTracks);
+    bossRadioBinding = std::move(bossBinding);
+    battleRadioTracks = std::move(battleTracks);
+    battleRadioBindings = std::move(battleBindings);
+    rollBathTracks = std::move(bathTracks);
+    endingSongTracks = std::move(endingTracks);
+    endingSongBinding = std::move(endingBinding);
+    gameplayRadioCallBytes = radioCallBytes;
+    gameplayRadioIdleBytes = radioIdleBytes;
     captionScripts = std::move(scripts);
     captionScenes = std::move(scenes);
-    size_t cues = 0, voices = 0;
+    size_t cues = 0, voices = 0, continuations = 0, continuationVoices = 0;
     for (const auto& track : subtitleTracks) cues += track.cues.size();
+    for (const auto& track : gameplayRadioTracks) cues += track.cues.size();
+    for (const auto& track : bossRadioTracks) cues += track.cues.size();
+    for (const auto& track : battleRadioTracks) cues += track.cues.size();
+    for (const auto& track : rollBathTracks) cues += track.cues.size();
+    for (const auto& track : endingSongTracks) cues += track.cues.size();
     for (const auto& script : captionScripts) voices += script.voices.size();
-    for (const auto& scene : captionScenes) voices += scene.voices.size();
-    Log("Loaded subtitle catalog tracks=" + std::to_string(subtitleTracks.size()) + " cues=" + std::to_string(cues) +
+    for (const auto& scene : captionScenes) {
+        voices += scene.voices.size();
+        continuations += scene.continuations.size();
+        for (const auto& continuation : scene.continuations) continuationVoices += continuation.script.voices.size();
+    }
+    Log("Loaded subtitle catalog tracks=" + std::to_string(subtitleTracks.size() + gameplayRadioTracks.size() +
+        bossRadioTracks.size() + battleRadioTracks.size() + rollBathTracks.size() + endingSongTracks.size()) + " cues=" + std::to_string(cues) +
         " scripts=" + std::to_string(captionScripts.size()) + " direct_scenes=" + std::to_string(captionScenes.size()) +
-        " voice_bindings=" + std::to_string(voices));
+        " voice_bindings=" + std::to_string(voices) + " continuations=" + std::to_string(continuations) +
+        " continuation_voices=" + std::to_string(continuationVoices) +
+        " scoped_gameplay_radio_tracks=" + std::to_string(gameplayRadioTracks.size()) +
+        " scoped_roll_bath_tracks=" + std::to_string(rollBathTracks.size()) +
+        " scoped_xa2d_boss_tracks=" + std::to_string(bossRadioTracks.size()) +
+        " scoped_xa40_battle_tracks=" + std::to_string(battleRadioTracks.size()) +
+        " ending_song_tracks=" + std::to_string(endingSongTracks.size()));
     return true;
 }
 
+static bool VerifyScriptTable(const CaptionScript& script) {
+    std::vector<uint32_t> actual(script.words.size());
+    SIZE_T returned = 0;
+    uint32_t terminator[2] = {};
+    return ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<void*>(script.start), actual.data(),
+        actual.size() * sizeof(uint32_t), &returned) && returned == actual.size() * sizeof(uint32_t) &&
+        actual == script.words && ReadGame(script.end, terminator) && terminator[0] == 255 && terminator[1] == 0;
+}
+
+static bool VerifyContinuationBinding(const CaptionContinuation& continuation) {
+    std::array<unsigned char, 5> registration = {}, scriptPush = {}, contextPush = {};
+    std::array<unsigned char, 16> callback = {};
+    return ReadGame(continuation.registration - registration.size(), registration) && registration == continuation.registrationBytes &&
+        ReadGame(continuation.callback, callback) && callback == continuation.callbackBytes &&
+        ReadGame(continuation.scriptPush, scriptPush) && scriptPush == continuation.scriptPushBytes &&
+        ReadGame(continuation.contextPush, contextPush) && contextPush == continuation.contextPushBytes &&
+        VerifyScriptTable(continuation.script);
+}
+
+static bool VerifyEndingSongBinding(unsigned slot) {
+    uint32_t source = 0, length = 0, handle = 0, wrapper = 0;
+    std::array<unsigned char, 16> actual = {};
+    std::array<uint32_t, 3> dispatch = {};
+    const auto& binding = endingSongBinding.controller;
+    if (slot < 1 || slot >= 8 || !ReadGame(0xa6b900, source) || source < 0x10000 ||
+        !ReadGame(0xa6b904, length) || length != endingSongBytes || source > 0xffffffffu - length ||
+        !ReadGame(0xa6b90c, handle) || handle != slot ||
+        (!originalPlayStream && (!ReadGame(0x40ae40, actual) || actual != endingSongBinding.playBytes)) ||
+        !ReadGame(0x40dccf, actual) || actual != binding.callBytes ||
+        !ReadGame(0x53c064, actual) || actual != endingSongBinding.creditsCallBytes ||
+        !ReadGame(0x53c050, actual) || actual != endingSongBinding.creditsCallbackBytes ||
+        !ReadGame(0x89a6d0 + 0x6e * 4, wrapper) || wrapper != 0x53bd40 ||
+        !ReadGame(wrapper, actual) || actual != binding.wrapperBytes ||
+        !ReadGame(0x8acc90, dispatch) || dispatch != binding.dispatchWords ||
+        !VerifyContinuationBinding(binding.continuation)) return false;
+    for (size_t index = 0; index < endingSongProbeOffsets.size(); ++index) {
+        std::array<unsigned char, 64> probe = {};
+        if (!ReadGame(source + endingSongProbeOffsets[index], probe) || probe != endingSongBinding.audioProbes[index]) return false;
+    }
+    return true;
+}
+
+static CaptionSelection SelectEndingSong(uintptr_t caller, unsigned slot, const SceneContext& context) {
+    if (endingSongTracks.empty() || caller != 0x40dcdf || EvaluateEndingSong(context) != CaptionGate::Allowed ||
+        !VerifyEndingSongBinding(slot)) return {};
+    return {&endingSongTracks.front()};
+}
+
 static bool VerifySceneBinding(const CaptionSelection& selection) {
+    if (selection.track && IsEndingSongTrack(*selection.track)) {
+        uint32_t slot = 0;
+        return ReadGame(0xa6b90c, slot) && VerifyEndingSongBinding(slot);
+    }
+    if (selection.gameplayRadio) {
+        std::array<unsigned char, 16> actual = {};
+        if (!selection.track || !ReadGame(0x55a6ca, actual)) return false;
+        if (selection.track->archive == "XA40_18.DAT") {
+            if (!IsBattleRadioTrack(selection.track->number)) return false;
+            const size_t count = selection.track->number == 25 ? 2 : 1;
+            for (size_t index = 0; index < count; ++index) {
+                const auto& expected = battleRadioControllers[index];
+                const auto& binding = battleRadioBindings[index];
+                uint32_t wrapper = 0;
+                std::array<unsigned char, 16> wrapperBytes = {};
+                std::array<uint32_t, 3> dispatch = {};
+                if (actual != binding.callBytes || !ReadGame(0x89a6d0 + expected.type * 4, wrapper) || wrapper != expected.wrapper ||
+                    !ReadGame(wrapper, wrapperBytes) || wrapperBytes != binding.wrapperBytes ||
+                    !ReadGame(expected.dispatch, dispatch) || dispatch != binding.dispatchWords ||
+                    !VerifyContinuationBinding(binding.continuation)) return false;
+            }
+            return true;
+        }
+        if (selection.track->archive == "XA2D_18.DAT") {
+            uint32_t wrapper = 0;
+            std::array<unsigned char, 16> wrapperBytes = {};
+            std::array<uint32_t, 3> dispatch = {};
+            return IsBossRadioTrack(selection.track->number) && actual == bossRadioBinding.callBytes &&
+                ReadGame(0x89a6d0 + 0x4a * 4, wrapper) && wrapper == 0x5301d0 &&
+                ReadGame(wrapper, wrapperBytes) && wrapperBytes == bossRadioBinding.wrapperBytes &&
+                ReadGame(0x8a86c0, dispatch) && dispatch == bossRadioBinding.dispatchWords &&
+                VerifyContinuationBinding(bossRadioBinding.continuation);
+        }
+        if (selection.track->archive != "XA26_18.DAT" || !IsGameplayRadioTrack(selection.track->number) ||
+            actual != gameplayRadioCallBytes) return false;
+        if (IsLateGameplayRadioTrack(selection.track->number)) {
+            std::array<unsigned char, 32> idle = {};
+            if (!ReadGame(gameplayRadioIdleScriptStart, idle) || idle != gameplayRadioIdleBytes) return false;
+        }
+        const bool chase = selection.track->number == 31;
+        const uint8_t type = chase ? 0x47 : 0x2d;
+        const uint32_t scriptStart = chase ? 0x8a8418 : gameplayRadioScriptStart;
+        const uint32_t scriptEnd = chase ? 0x8a8448 : gameplayRadioScriptEnd;
+        for (const auto& scene : captionScenes) {
+            if (scene.type == type && !scene.voices.empty()) {
+                for (const auto& continuation : scene.continuations) {
+                    if (continuation.script.start == scriptStart && continuation.script.end == scriptEnd) {
+                        return VerifySceneBinding({selection.track, nullptr, &scene.voices.front(), &scene});
+                    }
+                }
+            }
+        }
+        return false;
+    }
     std::array<unsigned char, 16> callBytes = {}, callbackBytes = {};
     std::array<uint32_t, 3> dispatchWords = {};
     if (selection.voice->dispatch && (!ReadGame(selection.voice->dispatch, dispatchWords) ||
         dispatchWords != selection.voice->dispatchWords)) return false;
     if (!ReadGame(selection.voice->caller - 16, callBytes) || callBytes != selection.voice->callBytes ||
         !ReadGame(selection.voice->callback, callbackBytes) || callbackBytes != selection.voice->callbackBytes) return false;
-    if (selection.script) {
-        std::vector<uint32_t> actual(selection.script->words.size());
-        SIZE_T returned = 0;
-        uint32_t terminator[2] = {};
-        return ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<void*>(selection.script->start), actual.data(),
-            actual.size() * sizeof(uint32_t), &returned) && returned == actual.size() * sizeof(uint32_t) &&
-            actual == selection.script->words && ReadGame(selection.script->end, terminator) &&
-            terminator[0] == 255 && terminator[1] == 0;
-    }
-    if (!selection.scene) return false;
+    if (selection.script && !VerifyScriptTable(*selection.script)) return false;
+    if (!selection.scene) return selection.script != nullptr;
     uint32_t wrapper = 0;
     std::array<unsigned char, 16> wrapperBytes = {};
-    return ReadGame(0x89a6d0 + selection.scene->type * 4, wrapper) && wrapper == selection.scene->wrapper &&
-        ReadGame(wrapper, wrapperBytes) && wrapperBytes == selection.scene->wrapperBytes;
+    if (!ReadGame(0x89a6d0 + selection.scene->type * 4, wrapper) || wrapper != selection.scene->wrapper ||
+        !ReadGame(wrapper, wrapperBytes) || wrapperBytes != selection.scene->wrapperBytes) return false;
+    for (const auto& voice : selection.scene->voices) {
+        if (!ReadGame(voice.dispatch, dispatchWords) || dispatchWords != voice.dispatchWords) return false;
+    }
+    for (const auto& continuation : selection.scene->continuations) {
+        if (!VerifyContinuationBinding(continuation)) return false;
+    }
+    return true;
 }
 
 static int FindCue(const SubtitleTrack& track, uint64_t milliseconds) {
@@ -528,16 +1166,78 @@ static void ClearVoice(const char* reason) {
     activeTrack = nullptr;
     activeScript = nullptr;
     activeScene = nullptr;
+    activeGameplayRadio = false;
 }
 
-static void LogSceneState() {
-    SceneContext context = ReadSceneContext();
+static void LogSceneState(const SceneContext& context) {
     std::ostringstream details;
     details << "Caption context readable=" << context.readable << " script=0x" << std::hex <<
         context.script << " scene=0x" << context.descriptor << " flags=0x" << static_cast<unsigned>(context.flags) <<
         " type=" << static_cast<unsigned>(context.type) << " messages=";
     for (uint32_t value : context.messageFlags) details << value << ":";
     Log(details.str());
+}
+
+static void LogSceneState() {
+    LogSceneState(ReadSceneContext());
+}
+
+static void AcquireCaptionClock(const CaptionSelection& selection, int slot, const std::string& description) {
+    IDirectSoundBuffer* buffer = nullptr;
+    if (!selection.track || slot < 0 || slot >= 8 || !ReadGame(0xa2ae10 + slot * 24, buffer) || !buffer) return;
+    buffer->AddRef();
+    DSBCAPS caps = {};
+    caps.dwSize = sizeof(caps);
+    WAVEFORMATEX format = {};
+    DWORD cursor = 0;
+    if (FAILED(buffer->GetCaps(&caps)) || FAILED(buffer->GetFormat(&format, sizeof(format), nullptr)) ||
+        FAILED(buffer->GetCurrentPosition(&cursor, nullptr)) || !caps.dwBufferBytes ||
+        !format.nAvgBytesPerSec || format.wFormatTag != WAVE_FORMAT_PCM) {
+        buffer->Release();
+        Log("Audio format could not be verified; subtitles disabled for this playback.");
+        return;
+    }
+    std::lock_guard<std::mutex> guard(voiceMutex);
+    observedVoice = buffer;
+    activeTrack = selection.track;
+    activeScript = selection.script;
+    activeScene = selection.scene;
+    activeGameplayRadio = selection.gameplayRadio;
+    voiceSlot = slot;
+    voiceStartedAt = GetTickCount64();
+    lastVoiceSample = 0;
+    voiceClock.Reset(caps.dwBufferBytes, format.nAvgBytesPerSec, cursor, voiceStartedAt);
+    Log(description + " slot=" + std::to_string(slot) + " bufferBytes=" + std::to_string(caps.dwBufferBytes) +
+        " bytesPerSecond=" + std::to_string(format.nAvgBytesPerSec) +
+        " scoped_gameplay_radio=" + std::to_string(selection.gameplayRadio) +
+        " scoped_roll_bath=" + std::to_string(IsRollBathTrack(*selection.track)) +
+        " ending_song=" + std::to_string(IsEndingSongTrack(*selection.track)));
+}
+
+static uintptr_t __cdecl PlayStream(unsigned slot) {
+    const uintptr_t caller = reinterpret_cast<uintptr_t>(__builtin_return_address(0));
+    const SceneContext before = ReadSceneContext();
+    const CaptionSelection selection = SelectEndingSong(caller, slot, before);
+    const bool creditsCall = caller == 0x40dcdf && before.type == 0x6e;
+    if (creditsCall) {
+        Log("Credits music event slot=" + std::to_string(slot) + " verified=" + std::to_string(selection.track != nullptr));
+        LogSceneState(before);
+    }
+    const uintptr_t result = originalPlayStream(slot);
+    const SceneContext after = creditsCall ? ReadSceneContext() : SceneContext{};
+    if (!selection.track || EvaluateEndingSong(after) != CaptionGate::Allowed) {
+        if (creditsCall) {
+            Log("Credits captions excluded: source identity, native binding or scene state not eligible.");
+            LogSceneState(after);
+        }
+        return result;
+    }
+    {
+        std::lock_guard<std::mutex> guard(voiceMutex);
+        ClearVoice("ending song started");
+    }
+    AcquireCaptionClock(selection, static_cast<int>(slot), "Ending song accepted: verified Staff resource 0");
+    return result;
 }
 
 static void __cdecl LoadVoice(unsigned request) {
@@ -570,47 +1270,23 @@ static void __cdecl LoadVoice(unsigned request) {
         ClearVoice("voice replaced");
     }
     originalLoadVoice(request);
-    if (!eligible || EvaluateContext(ReadSceneContext(), selection.script, selection.scene) != CaptionGate::Allowed) {
+    if (!eligible || EvaluateContext(ReadSceneContext(), selection.script, selection.scene,
+        selection.track) != CaptionGate::Allowed) {
         Log("Voice excluded from extra subtitles: audio, callback, script signature, or native message state not eligible.");
         return;
     }
     int slot = -1;
-    IDirectSoundBuffer* buffer = nullptr;
-    if (ReadGame(0x9193f4, slot) && slot >= 0 && slot < 8 && ReadGame(0xa2ae10 + slot * 24, buffer) && buffer) {
-        buffer->AddRef();
-        DSBCAPS caps = {};
-        caps.dwSize = sizeof(caps);
-        WAVEFORMATEX format = {};
-        DWORD cursor = 0;
-        if (FAILED(buffer->GetCaps(&caps)) || FAILED(buffer->GetFormat(&format, sizeof(format), nullptr)) ||
-            FAILED(buffer->GetCurrentPosition(&cursor, nullptr)) || !caps.dwBufferBytes ||
-            !format.nAvgBytesPerSec || format.wFormatTag != WAVE_FORMAT_PCM) {
-            buffer->Release();
-            Log("Audio format could not be verified; subtitles disabled for this playback.");
-            return;
-        }
-        std::lock_guard<std::mutex> guard(voiceMutex);
-        observedVoice = buffer;
-        activeTrack = selection.track;
-        activeScript = selection.script;
-        activeScene = selection.scene;
-        voiceSlot = slot;
-        voiceStartedAt = GetTickCount64();
-        lastVoiceSample = 0;
-        voiceClock.Reset(caps.dwBufferBytes, format.nAvgBytesPerSec, cursor, voiceStartedAt);
-        Log("Subtitle voice request=" + std::to_string(request) + " archive=" + archive +
-            " track=" + std::to_string(identifiers[1] + 1) + " slot=" + std::to_string(slot) +
-            " bufferBytes=" + std::to_string(caps.dwBufferBytes) +
-            " bytesPerSecond=" + std::to_string(format.nAvgBytesPerSec));
-    }
+    if (ReadGame(0x9193f4, slot)) AcquireCaptionClock(selection, slot, "Subtitle voice request=" +
+        std::to_string(request) + " archive=" + archive + " track=" + std::to_string(identifiers[1] + 1));
 }
 
 static VOID CALLBACK SampleVoiceClock(PVOID, BOOLEAN) {
     std::lock_guard<std::mutex> guard(voiceMutex);
-    if (!observedVoice || !activeTrack || (!activeScript && !activeScene)) return;
-    CaptionGate gate = EvaluateContext(ReadSceneContext(), activeScript, activeScene);
+    if (!observedVoice || !activeTrack || (!activeScript && !activeScene && !activeGameplayRadio && !IsEndingSongTrack(*activeTrack))) return;
+    const SceneContext sceneContext = ReadSceneContext();
+    CaptionGate gate = EvaluateContext(sceneContext, activeScript, activeScene, activeTrack);
     if (gate == CaptionGate::Unknown || gate == CaptionGate::OutsideScript) {
-        LogSceneState();
+        LogSceneState(sceneContext);
         ClearVoice("cinematic context ended or cannot be verified");
         return;
     }
@@ -641,12 +1317,13 @@ static VOID CALLBACK SampleVoiceClock(PVOID, BOOLEAN) {
         activeCue = selected;
         Log("Track=" + std::to_string(DiagnosticTrackNumber(*activeTrack)) + " Cue=" + std::to_string(selected + 1) +
             " media_ms=" + std::to_string(milliseconds) + " gate=" + std::to_string(static_cast<int>(gate)));
+        if (activeGameplayRadio || IsRollBathTrack(*activeTrack) || IsEndingSongTrack(*activeTrack)) LogSceneState(sceneContext);
     }
     if (wasRunning != playing) Log(playing ? "Subtitle audio resumed." : "Subtitle audio paused.");
     if (now - lastVoiceSample >= 10000) {
         Log("Subtitle clock track=" + std::to_string(DiagnosticTrackNumber(*activeTrack)) + " media_ms=" + std::to_string(milliseconds) + " wall_ms=" +
             std::to_string(now - voiceStartedAt) + " cursor=" + std::to_string(cursor));
-        LogSceneState();
+        LogSceneState(sceneContext);
         lastVoiceSample = now;
     }
 }
@@ -671,10 +1348,18 @@ static void ObserveVoice() {
             if (originalLoadVoice) Log("Verified voice loader and native message-state bindings installed; each cinematic binding is checked at playback.");
         }
     }
+    if (!originalPlayStream && !endingSongTracks.empty() && reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr)) == 0x400000) {
+        std::array<unsigned char, 16> actual = {};
+        if (ReadGame(0x40ae40, actual) && actual == endingSongBinding.playBytes) {
+            originalPlayStream = reinterpret_cast<PlayStreamFunction>(Install(
+                reinterpret_cast<void*>(0x40ae40), reinterpret_cast<void*>(&PlayStream)));
+            if (originalPlayStream) Log("Verified credits music-start hook installed; other audio calls remain uncaptioned.");
+        }
+    }
 }
 
 static int CaptureSlot(unsigned track, int cue) {
-    if (track > 1) return track <= 160 && cue == 0 ? static_cast<int>(track + 2) : -1;
+    if (track > 1) return track <= maximumDiagnosticTrack && cue == 0 ? static_cast<int>(track + 2) : -1;
     if (cue == 1) return 0;
     if (cue == 6) return 1;
     if (cue == 18) return 2;
@@ -748,7 +1433,8 @@ static bool DrawSubtitle(void* surface) {
     unsigned trackNumber = 0;
     {
         std::lock_guard<std::mutex> guard(voiceMutex);
-        if (!activeTrack || EvaluateContext(ReadSceneContext(), activeScript, activeScene) != CaptionGate::Allowed) return false;
+        if (!activeTrack || EvaluateContext(ReadSceneContext(), activeScript, activeScene,
+            activeTrack) != CaptionGate::Allowed) return false;
         cueIndex = activeCue;
         trackNumber = DiagnosticTrackNumber(*activeTrack);
         if (cueIndex >= 0) text = activeTrack->cues[cueIndex].text;
@@ -1004,6 +1690,7 @@ extern "C" __declspec(dllexport) int __cdecl Diagnose() {
         }
     }
     const auto& firstScript = captionScripts.front();
+    size_t continuationCases = 0;
     for (const auto& scene : captionScenes) {
         SceneContext context;
         context.readable = true;
@@ -1033,8 +1720,431 @@ extern "C" __declspec(dllexport) int __cdecl Diagnose() {
                         !SelectCaption(voice.caller, 0, "XA02_37.DAT", 0, dialog).track;
                 }
             }
+            for (const auto& continuation : scene.continuations) {
+                SceneContext scripted = context;
+                scripted.flags = 5;
+                for (uint32_t position = continuation.script.start; position < continuation.script.end; position += 8) {
+                    scripted.script = position;
+                    for (const auto& track : subtitleTracks) {
+                        CaptionSelection selected = SelectCaption(voice.caller, 0, track.archive.c_str(), track.number - 1, scripted);
+                        bool sameScript = selected.script && selected.script->start == continuation.script.start &&
+                            selected.script->end == continuation.script.end;
+                        eligibility = eligibility && selected.track == &track &&
+                            ((selected.scene == &scene && !selected.script) || sameScript);
+                        ++continuationCases;
+                    }
+                }
+                for (unsigned scenario = 0; scenario < 6; ++scenario) {
+                    SceneContext rejected = scripted;
+                    if (scenario == 0) rejected.script = continuation.script.end;
+                    if (scenario == 1) rejected.script = continuation.script.start - 8;
+                    if (scenario == 2) rejected.script = continuation.script.start + 1;
+                    if (scenario == 3) rejected.type = static_cast<uint8_t>(scene.type + 1);
+                    if (scenario == 4) rejected.flags = 0;
+                    if (scenario == 5) rejected.readable = false;
+                    eligibility = eligibility && EvaluateContext(rejected, nullptr, &scene) != CaptionGate::Allowed;
+                }
+                for (size_t channel = 0; channel < scripted.messageFlags.size(); ++channel) {
+                    for (uint32_t flag : {0x80u, 0x8000u}) {
+                        SceneContext dialog = scripted;
+                        dialog.messageFlags[channel] = flag;
+                        eligibility = eligibility && EvaluateContext(dialog, nullptr, &scene) == CaptionGate::NativeMessage &&
+                            !SelectCaption(voice.caller, 0, "XA02_37.DAT", 0, dialog).track;
+                    }
+                }
+                eligibility = eligibility && !SelectCaption(0x55a6da, 0, "XA02_37.DAT", 0, scripted).track &&
+                    !SelectCaption(voice.caller, 0x8000, "XA02_37.DAT", 0, scripted).track &&
+                    !SelectCaption(voice.caller, 0, "XA12_18.DAT", 0, scripted).track;
+            }
         }
     }
+    bool continuationVoicesPassed = true;
+    size_t continuationVoiceCases = 0;
+    for (const auto& scene : captionScenes) {
+        for (const auto& continuation : scene.continuations) {
+            const auto& script = continuation.script;
+            SceneContext context;
+            context.readable = true;
+            context.flags = 5;
+            context.type = scene.type;
+            for (const auto& voice : script.voices) {
+                for (uint32_t address = script.start; address < script.end; address += 8) {
+                    context.script = address;
+                    for (const auto& track : subtitleTracks) {
+                        CaptionSelection selected = SelectCaption(voice.caller, 0, track.archive.c_str(), track.number - 1, context);
+                        continuationVoicesPassed = continuationVoicesPassed && selected.track == &track && selected.script &&
+                            selected.script->start == script.start && selected.script->end == script.end;
+                        ++continuationVoiceCases;
+                    }
+                }
+                for (size_t channel = 0; channel < context.messageFlags.size(); ++channel) {
+                    SceneContext dialog = context;
+                    dialog.messageFlags[channel] = 0x8080;
+                    continuationVoicesPassed = continuationVoicesPassed &&
+                        EvaluateContext(dialog, &script, &scene) == CaptionGate::NativeMessage &&
+                        !SelectCaption(voice.caller, 0, "XA15_37.DAT", 8, dialog).track;
+                }
+                for (unsigned scenario = 0; scenario < 7; ++scenario) {
+                    SceneContext rejected = context;
+                    if (scenario == 0) rejected.script = 0;
+                    if (scenario == 1) rejected.script = script.end;
+                    if (scenario == 2) rejected.script = script.start + 1;
+                    if (scenario == 3) rejected.script = script.start - 8;
+                    if (scenario == 4) rejected.type = static_cast<uint8_t>(scene.type + 1);
+                    if (scenario == 5) rejected.flags = 0;
+                    if (scenario == 6) rejected.readable = false;
+                    continuationVoicesPassed = continuationVoicesPassed &&
+                        EvaluateContext(rejected, &script, &scene) != CaptionGate::Allowed;
+                }
+            }
+        }
+    }
+    SceneContext airshipContext;
+    airshipContext.readable = true;
+    airshipContext.flags = 5;
+    airshipContext.type = 0x39;
+    airshipContext.script = 0x8a5de0;
+    CaptionSelection airship = SelectCaption(0x52a490, 8, "XA15_37.DAT", 8, airshipContext);
+    bool airshipPassed = airship.track && airship.script && airship.scene &&
+        airship.script->start == 0x8a5dc8 && airship.scene->type == 0x39;
+    size_t airshipCues = 0;
+    if (airshipPassed) {
+        PlaybackClock airshipClock;
+        airshipClock.Reset(147456, 176400, 0, 1000);
+        int previousCue = -1;
+        for (uint64_t milliseconds = 10; milliseconds <= airship.track->cues.back().end; milliseconds += 10) {
+            uint32_t cursor = static_cast<uint32_t>((milliseconds * 176400 / 1000) % 147456);
+            airshipPassed = airshipPassed && EvaluateContext(airshipContext, airship.script, airship.scene) == CaptionGate::Allowed &&
+                airshipClock.Sample(cursor, 1000 + milliseconds, true);
+            int cue = FindCue(*airship.track, airshipClock.Milliseconds());
+            if (cue >= 0 && cue != previousCue) ++airshipCues;
+            previousCue = cue;
+        }
+        airshipPassed = airshipPassed && airshipCues == airship.track->cues.size();
+        for (uint32_t script : {0u, 0x8a5df8u, 0x8a2320u, 0x8a5de1u}) {
+            SceneContext rejected = airshipContext;
+            rejected.script = script;
+            airshipPassed = airshipPassed && !SelectCaption(0x52a490, 8, "XA15_37.DAT", 8, rejected).track;
+        }
+        airshipContext.type = 0x38;
+        airshipPassed = airshipPassed && !SelectCaption(0x52a490, 8, "XA15_37.DAT", 8, airshipContext).track;
+    }
+    Log("Continuation-owned voice selections=" + std::to_string(continuationVoiceCases) + ": " +
+        (continuationVoicesPassed ? "PASS" : "FAIL"));
+    Log("Recorded rescue/airship callback replay cues=" + std::to_string(airshipCues) + ": " + (airshipPassed ? "PASS" : "FAIL"));
+    bool radioPassed = true;
+    size_t radioCues = 0, radioRejections = 0;
+    for (const auto& track : gameplayRadioTracks) {
+        SceneContext context;
+        context.readable = true;
+        const bool lateRadio = IsLateGameplayRadioTrack(track.number);
+        const size_t radioChannel = GameplayRadioMessageChannel(track.number);
+        const uint32_t start = lateRadio ? gameplayRadioIdleScriptEnd : gameplayRadioScriptStart;
+        const uint32_t end = lateRadio ? gameplayRadioIdleScriptEnd : gameplayRadioScriptEnd;
+        context.type = lateRadio ? 0 : 0x2d;
+        context.descriptor = GameplayRadioDescriptor(track.number);
+        context.messageFlags[radioChannel] = 0x300c3;
+        const unsigned request = 0x8000u | (track.number - 1);
+        for (uint32_t script = start; script <= end; script += 8) {
+            context.script = script;
+            CaptionSelection selected = SelectCaption(0x55a6da, request, track.archive.c_str(), track.number - 1, context);
+            radioPassed = radioPassed && selected.track == &track && selected.gameplayRadio && !selected.voice &&
+                EvaluateContext(context, selected.script, selected.scene, selected.gameplayRadio ? selected.track : nullptr) == CaptionGate::Allowed;
+            for (uint32_t flags : {0x300c3u, 0x310c3u, 0x320c3u, 0x330c3u,
+                0x30083u, 0x31083u, 0x32083u, 0x33083u}) {
+                SceneContext playback = context;
+                playback.messageFlags[radioChannel] = flags;
+                radioPassed = radioPassed && EvaluateContext(playback, selected.script, selected.scene,
+                    selected.gameplayRadio ? selected.track : nullptr) == CaptionGate::Allowed;
+            }
+        }
+        for (unsigned scenario = 0; scenario < 23; ++scenario) {
+            SceneContext rejected = context;
+            uintptr_t caller = 0x55a6da;
+            unsigned voiceRequest = request, audioTrack = track.number - 1;
+            const char* archive = "XA26_18.DAT";
+            if (scenario == 0) rejected.readable = false;
+            if (scenario == 1) rejected.descriptor += 4;
+            if (scenario == 2) rejected.type += 1;
+            if (scenario == 3) rejected.flags = 1;
+            if (scenario == 4) rejected.script = 0x88b960;
+            if (scenario == 5) rejected.messageFlags[radioChannel] = 0x100c3;
+            if (scenario == 6) rejected.messageFlags[radioChannel] = 0;
+            if (scenario == 7) rejected.messageFlags[0] = 0x80;
+            if (scenario == 8) rejected.messageFlags[3] = 0x8000;
+            if (scenario == 9) caller += 1;
+            if (scenario == 10) archive = "XA1F_18.DAT";
+            if (scenario == 11) voiceRequest &= 0x7fff;
+            if (scenario == 12) { audioTrack = 6; voiceRequest = 0x8006; }
+            if (scenario == 13) rejected.script = start - 8;
+            if (scenario == 14) rejected.script = end + 8;
+            if (scenario == 15) rejected.script = start + 1;
+            if (scenario == 16) rejected.messageFlags[radioChannel] = 0x130c3;
+            if (scenario == 17) rejected.messageFlags[radioChannel] = 0x380c3;
+            if (scenario == 18) { audioTrack = 10; voiceRequest = 0x800a; }
+            if (scenario == 19) {
+                rejected.type = lateRadio ? 0x2d : 0;
+                rejected.script = lateRadio ? gameplayRadioScriptStart : gameplayRadioIdleScriptEnd;
+            }
+            if (scenario == 20) {
+                rejected.messageFlags[radioChannel] = 0;
+                rejected.messageFlags[radioChannel == 4 ? 2 : 4] = 0x300c3;
+            }
+            if (scenario == 21) { audioTrack = 31; voiceRequest = 0x801f; }
+            if (scenario == 22) rejected.descriptor = track.number == 31 ? 0x8f4660 : 0x8ebee0;
+            radioPassed = radioPassed && !SelectCaption(caller, voiceRequest, archive, audioTrack, rejected).track;
+            if (scenario == 5 || scenario == 7 || scenario == 8 || scenario == 16 || scenario == 17 || scenario == 20) {
+                radioPassed = radioPassed && EvaluateGameplayRadio(rejected, track.number) == CaptionGate::NativeMessage;
+            }
+            ++radioRejections;
+        }
+        for (const auto& cue : track.cues) {
+            radioPassed = radioPassed && FindCue(track, cue.start) >= 0 &&
+                EvaluateContext(context, nullptr, nullptr, &track) == CaptionGate::Allowed;
+            ++radioCues;
+        }
+        for (size_t channel = 0; channel < context.messageFlags.size(); ++channel) {
+            if (channel == radioChannel) continue;
+            SceneContext dialog = context;
+            dialog.messageFlags[channel] = 0x8080;
+            radioPassed = radioPassed && EvaluateContext(dialog, nullptr, nullptr, &track) == CaptionGate::NativeMessage &&
+                !SelectCaption(0x55a6da, request, track.archive.c_str(), track.number - 1, dialog).track;
+        }
+        context.descriptor = 0;
+        radioPassed = radioPassed && EvaluateContext(context, nullptr, nullptr, &track) == CaptionGate::OutsideScript;
+    }
+    Log("Scoped gameplay radio cues=" + std::to_string(radioCues) + " rejected_cases=" + std::to_string(radioRejections) +
+        ": " + (radioPassed ? "PASS" : "FAIL"));
+    bool bossPassed = true;
+    size_t bossRejections = 0, bossCues = 0;
+    for (const auto& track : bossRadioTracks) {
+        SceneContext context;
+        context.readable = true;
+        context.type = 0x4a;
+        context.descriptor = 0x8f2064;
+        context.script = bossRadioScriptEnd;
+        context.messageFlags[4] = 0x300c3;
+        const unsigned request = 0x8000u | (track.number - 1);
+        for (uint32_t position : {bossRadioScriptStart, bossRadioScriptEnd}) {
+            context.script = position;
+            const auto selected = SelectCaption(0x55a6da, request, track.archive.c_str(), track.number - 1, context);
+            bossPassed = bossPassed && selected.track == &track && selected.gameplayRadio && !selected.script && !selected.scene;
+            for (uint32_t flags : {0u, 0x300c3u, 0x310c3u, 0x320c3u, 0x330c3u, 0x30083u, 0x31083u, 0x32083u, 0x33083u}) {
+                SceneContext playback = context;
+                playback.messageFlags[4] = flags;
+                bossPassed = bossPassed && EvaluateContext(playback, nullptr, nullptr, &track) == CaptionGate::Allowed;
+            }
+        }
+        for (unsigned scenario = 0; scenario < 23; ++scenario) {
+            SceneContext rejected = context;
+            uintptr_t caller = 0x55a6da;
+            unsigned voiceRequest = request, audioTrack = track.number - 1;
+            const char* archive = "XA2D_18.DAT";
+            if (scenario == 0) rejected.readable = false;
+            if (scenario == 1) rejected.descriptor = 0x8f4660;
+            if (scenario == 2) rejected.type = 0;
+            if (scenario == 3) rejected.flags = 1;
+            if (scenario == 4) rejected.script = bossRadioScriptStart - 8;
+            if (scenario == 5) rejected.script += 8;
+            if (scenario == 6) rejected.script += 1;
+            if (scenario == 7) rejected.script = 0x88b7a0;
+            if (scenario == 8) rejected.messageFlags[4] = 0x100c3;
+            if (scenario == 9) rejected.messageFlags[4] = 0x130c3;
+            if (scenario == 10) rejected.messageFlags[4] = 0x380c3;
+            if (scenario == 11) rejected.messageFlags[4] = 0;
+            if (scenario == 12) caller += 1;
+            if (scenario == 13) voiceRequest &= 0x7fff;
+            if (scenario == 14) { audioTrack = 29; voiceRequest = 0x801d; }
+            if (scenario == 15) { audioTrack = 39; voiceRequest = 0x8027; }
+            if (scenario == 16) archive = "XA26_18.DAT";
+            if (scenario == 17) archive = "XA12_37.DAT";
+            if (scenario == 18) { rejected.messageFlags[4] = 0; rejected.messageFlags[2] = 0x300c3; }
+            if (scenario >= 19) rejected.messageFlags[scenario - 19] = 0x8080;
+            bossPassed = bossPassed && !SelectCaption(caller, voiceRequest, archive, audioTrack, rejected).track;
+            ++bossRejections;
+        }
+        for (size_t index = 0; index < track.cues.size(); ++index) {
+            const auto& cue = track.cues[index];
+            const int next = index + 1 < track.cues.size() && track.cues[index + 1].start == cue.end ?
+                static_cast<int>(index + 1) : -1;
+            bossPassed = bossPassed && FindCue(track, cue.start) == static_cast<int>(index) && FindCue(track, cue.end) == next;
+            ++bossCues;
+        }
+    }
+    Log("Scoped XA2D boss cues=" + std::to_string(bossCues) + " rejected_cases=" +
+        std::to_string(bossRejections) + ": " + (bossPassed ? "PASS" : "FAIL"));
+    bool battlePassed = true;
+    size_t battleRejections = 0, battlePositions = 0;
+    for (const auto& track : battleRadioTracks) {
+        const bool transition = track.number == 25;
+        const auto& controller = battleRadioControllers[transition ? 1 : 0];
+        SceneContext context;
+        context.readable = true;
+        context.type = controller.type;
+        context.flags = transition ? 5 : 0;
+        context.descriptor = 0x90924c;
+        context.script = transition ? 0 : controller.scriptEnd;
+        context.messageFlags[4] = 0x300c3;
+        const unsigned request = 0x8000u | (track.number - 1);
+        const auto selected = SelectCaption(0x55a6da, request, track.archive.c_str(), track.number - 1, context);
+        battlePassed = battlePassed && selected.track == &track && selected.gameplayRadio && !selected.script && !selected.scene;
+        std::vector<uint32_t> positions;
+        if (transition) positions.push_back(0);
+        for (uint32_t position = controller.scriptStart; position < controller.scriptEnd; position += 8) positions.push_back(position);
+        if (!transition) positions.push_back(controller.scriptEnd);
+        for (uint32_t position : positions) {
+            for (unsigned phase = 0; phase < (transition ? 2u : 1u); ++phase) {
+                SceneContext playback = context;
+                playback.script = position;
+                playback.flags = transition ? (phase ? 5 : 1) : 0;
+                for (uint32_t flags : {0u, 0x300c3u, 0x310c3u, 0x320c3u, 0x330c3u, 0x30083u, 0x31083u, 0x32083u, 0x33083u}) {
+                    playback.messageFlags[4] = flags;
+                    battlePassed = battlePassed && EvaluateContext(playback, nullptr, nullptr, &track) == CaptionGate::Allowed;
+                    ++battlePositions;
+                }
+                if (!transition) {
+                    playback.messageFlags[4] = 0x300c3;
+                    battlePassed = battlePassed && SelectCaption(0x55a6da, request, track.archive.c_str(), track.number - 1, playback).track == &track;
+                }
+            }
+        }
+        if (transition) {
+            const auto& combat = battleRadioControllers[0];
+            SceneContext playback = context;
+            playback.type = combat.type;
+            playback.flags = 0;
+            for (uint32_t position = combat.scriptStart; position <= combat.scriptEnd; position += 8) {
+                playback.script = position;
+                playback.messageFlags[4] = 0x300c3;
+                battlePassed = battlePassed && SelectCaption(0x55a6da, request, track.archive.c_str(), track.number - 1, playback).track == &track;
+                for (uint32_t flags : {0u, 0x300c3u, 0x310c3u, 0x320c3u, 0x330c3u, 0x30083u, 0x31083u, 0x32083u, 0x33083u}) {
+                    playback.messageFlags[4] = flags;
+                    battlePassed = battlePassed && EvaluateContext(playback, nullptr, nullptr, &track) == CaptionGate::Allowed;
+                    ++battlePositions;
+                }
+            }
+        }
+        for (unsigned scenario = 0; scenario < 25; ++scenario) {
+            SceneContext rejected = context;
+            uintptr_t caller = 0x55a6da;
+            unsigned voiceRequest = request, audioTrack = track.number - 1;
+            const char* archive = "XA40_18.DAT";
+            if (scenario == 0) rejected.readable = false;
+            if (scenario == 1) rejected.descriptor = 0x8f2064;
+            if (scenario == 2) rejected.type = transition ? 0x59 : 0x5a;
+            if (scenario == 3) rejected.flags = 2;
+            if (scenario == 4) rejected.script = controller.scriptStart - 8;
+            if (scenario == 5) rejected.script = controller.scriptEnd + 8;
+            if (scenario == 6) rejected.script = controller.scriptStart + 1;
+            if (scenario == 7) rejected.script = 0x88b7a0;
+            if (scenario == 8) rejected.messageFlags[4] = 0x100c3;
+            if (scenario == 9) rejected.messageFlags[4] = 0x130c3;
+            if (scenario == 10) rejected.messageFlags[4] = 0x380c3;
+            if (scenario == 11) rejected.messageFlags[4] = 0;
+            if (scenario == 12) caller += 1;
+            if (scenario == 13) voiceRequest &= 0x7fff;
+            if (scenario == 14) archive = "XA26_18.DAT";
+            if (scenario == 15) archive = "XA40_37.DAT";
+            if (scenario == 16) { rejected.messageFlags[4] = 0; rejected.messageFlags[2] = 0x300c3; }
+            if (scenario == 17) rejected.flags = transition ? 1 : 5;
+            if (scenario == 18) { audioTrack = transition ? 26 : 29; voiceRequest = 0x8000u | audioTrack; }
+            if (scenario == 19) { audioTrack = 25; voiceRequest = 0x8019; }
+            if (scenario == 20) { audioTrack = 34; voiceRequest = 0x8022; }
+            if (scenario >= 21) rejected.messageFlags[scenario - 21] = 0x8080;
+            battlePassed = battlePassed && !SelectCaption(caller, voiceRequest, archive, audioTrack, rejected).track;
+            ++battleRejections;
+        }
+        const auto& cue = track.cues.front();
+        battlePassed = battlePassed && FindCue(track, cue.start) == 0 && FindCue(track, cue.end) == -1;
+    }
+    Log("Scoped XA40 battle cues=" + std::to_string(battleRadioTracks.size()) + " playback_contexts=" +
+        std::to_string(battlePositions) + " rejected_cases=" + std::to_string(battleRejections) + ": " + (battlePassed ? "PASS" : "FAIL"));
+    bool bathPassed = true;
+    size_t bathRejections = 0;
+    for (const auto& track : rollBathTracks) {
+        SceneContext context;
+        context.readable = true;
+        context.flags = 5;
+        context.type = 0x70;
+        context.descriptor = 0x8d4acc;
+        context.script = rollBathScriptStart;
+        const auto selected = SelectCaption(0x53d35c, 0xff03, "XACOM_18.DAT", 3, context);
+        bathPassed = bathPassed && selected.track == &track && selected.script && selected.voice &&
+            !selected.gameplayRadio && !selected.scene;
+        for (uint8_t flags : {1, 5}) {
+            for (uint32_t position = rollBathScriptStart; position < rollBathScriptEnd; position += 8) {
+                SceneContext playback = context;
+                playback.flags = flags;
+                playback.script = position;
+                bathPassed = bathPassed && EvaluateContext(playback, selected.script, nullptr, &track) == CaptionGate::Allowed;
+            }
+        }
+        for (unsigned scenario = 0; scenario < 22; ++scenario) {
+            SceneContext rejected = context;
+            uintptr_t caller = 0x53d35c;
+            unsigned request = 0xff03, audioTrack = 3;
+            const char* archive = "XACOM_18.DAT";
+            if (scenario == 0) rejected.readable = false;
+            if (scenario == 1) rejected.descriptor = 0x8ebee0;
+            if (scenario == 2) rejected.type = 0;
+            if (scenario == 3) rejected.flags = 0;
+            if (scenario == 4) rejected.flags = 4;
+            if (scenario == 5) rejected.flags = 3;
+            if (scenario == 6) rejected.script = rollBathScriptStart - 8;
+            if (scenario == 7) rejected.script = rollBathScriptEnd;
+            if (scenario == 8) rejected.script += 1;
+            if (scenario == 9) rejected.script = 0x88b7a0;
+            if (scenario == 10) caller += 1;
+            if (scenario == 11) caller = 0x55a6da;
+            if (scenario == 12) request = 0xff02;
+            if (scenario == 13) request = 0xff04;
+            if (scenario == 14) request = 0x8003;
+            if (scenario == 15) request = 0x7f03;
+            if (scenario == 16) audioTrack = 2;
+            if (scenario == 17) audioTrack = 4;
+            if (scenario == 18) archive = "XA26_18.DAT";
+            if (scenario == 19) archive = "XA02_37.DAT";
+            if (scenario == 20) rejected.flags = 1;
+            if (scenario == 21) rejected.script += 8;
+            bathPassed = bathPassed && !SelectCaption(caller, request, archive, audioTrack, rejected).track;
+            ++bathRejections;
+        }
+        for (size_t channel = 0; channel < context.messageFlags.size(); ++channel) {
+            SceneContext dialog = context;
+            dialog.messageFlags[channel] = 0x8080;
+            bathPassed = bathPassed && !SelectCaption(0x53d35c, 0xff03, "XACOM_18.DAT", 3, dialog).track &&
+                EvaluateContext(dialog, selected.script, nullptr, &track) == CaptionGate::NativeMessage;
+            ++bathRejections;
+        }
+    }
+    Log("Scoped Roll event tracks=" + std::to_string(rollBathTracks.size()) + " rejected_cases=" +
+        std::to_string(bathRejections) + ": " + (bathPassed ? "PASS" : "FAIL"));
+    SceneContext handoffContext;
+    handoffContext.readable = true;
+    handoffContext.flags = 5;
+    handoffContext.type = 0x1c;
+    CaptionSelection handoff = SelectCaption(0x5203ec, 7, "XA12_37.DAT", 7, handoffContext);
+    bool handoffPassed = handoff.track && handoff.scene && !handoff.script;
+    size_t replayedCues = 0;
+    if (handoffPassed) {
+        PlaybackClock handoffClock;
+        handoffClock.Reset(147456, 176400, 0, 1000);
+        int previousCue = -1;
+        for (uint64_t milliseconds = 10; milliseconds <= handoff.track->cues.back().end; milliseconds += 10) {
+            if (milliseconds >= 1070) handoffContext.script = 0x8a2320;
+            uint32_t position = static_cast<uint32_t>((milliseconds * 176400 / 1000) % 147456);
+            handoffPassed = handoffPassed && EvaluateContext(handoffContext, handoff.script, handoff.scene) == CaptionGate::Allowed &&
+                handoffClock.Sample(position, 1000 + milliseconds, true) && handoffClock.Milliseconds() == milliseconds;
+            int cue = FindCue(*handoff.track, handoffClock.Milliseconds());
+            if (cue >= 0 && cue != previousCue) ++replayedCues;
+            previousCue = cue;
+        }
+        handoffPassed = handoffPassed && replayedCues == handoff.track->cues.size();
+        handoffContext.script = 0x8a2380;
+        handoffPassed = handoffPassed && EvaluateContext(handoffContext, handoff.script, handoff.scene) == CaptionGate::OutsideScript;
+    }
+    Log("Registered continuation gate selections=" + std::to_string(continuationCases) + ": " + (eligibility ? "PASS" : "FAIL"));
+    Log("Recorded 43:48 handoff deterministic replay cues=" + std::to_string(replayedCues) + ": " + (handoffPassed ? "PASS" : "FAIL"));
     SceneContext opening;
     opening.readable = true;
     opening.flags = 1;
@@ -1067,10 +2177,11 @@ extern "C" __declspec(dllexport) int __cdecl Diagnose() {
     activeScript = &firstScript;
     activeCue = 0;
     ClearVoice("diagnostic transition");
-    bool cleared = !activeTrack && !activeScript && !activeScene && activeCue == -1 && voiceSlot == -1 && !voiceClock.valid;
+    bool cleared = !activeTrack && !activeScript && !activeScene && !activeGameplayRadio && activeCue == -1 && voiceSlot == -1 && !voiceClock.valid;
     Log("Cinematic gate selections=" + std::to_string(bindingCases) + " with wrong caller/audio/script and native-message exclusions: " +
         (eligibility && cleared ? "PASS" : "FAIL"));
-    bool passed = wrap && pause && resume && gap && boundaries && eligibility && cleared && bankIdentity;
+    bool passed = wrap && pause && resume && gap && boundaries && eligibility && cleared && bankIdentity && handoffPassed &&
+        continuationVoicesPassed && airshipPassed && radioPassed && bathPassed && bossPassed && battlePassed;
     Log(std::string("Subtitle clock wrap/pause/resume/stall and cue-boundary tests: ") + (passed ? "PASS" : "FAIL"));
     return passed ? 0 : 2;
 }

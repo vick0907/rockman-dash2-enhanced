@@ -43,8 +43,9 @@ $rootFiles = @('.gitignore', '.gitattributes', 'Build.ps1', 'Package.ps1', 'Conv
 $extensions = @('.cpp', '.c', '.h', '.hpp', '.ps1', '.json', '.ini', '.txt', '.md', '.mit')
 $documentationImages = @('docs/screenshots/subtitles-opening.png', 'docs/screenshots/subtitles-1080p.png',
     'docs/screenshots/xinput-buttons.png', 'docs/screenshots/resolution-1080p.png')
+$artworkFiles = @('assets/RockmanDash2-Enhanced.ico', 'assets/RockmanDash2-Enhanced.png')
 foreach ($relative in $tracked) {
-    if ($relative -in $documentationImages) { continue }
+    if ($relative -in $documentationImages -or $relative -in $artworkFiles) { continue }
     $allowedRoot = $relative -in $rootFiles
     $allowedDirectory = $relative -match '^(src|scripts|tests|third_party|assets)/'
     $extension = [IO.Path]::GetExtension($relative).ToLowerInvariant()
@@ -73,7 +74,7 @@ try {
     foreach ($name in @('Convert-DiscImage.ps1', 'README.md', 'LICENSE.md', 'THIRD_PARTY_NOTICES.md')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $stage $name)
     }
-    foreach ($relative in $documentationImages) {
+    foreach ($relative in ($documentationImages + $artworkFiles)) {
         $destination = Join-Path $stage $relative
         [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destination))
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $relative) -Destination $destination

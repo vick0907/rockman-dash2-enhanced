@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([switch]$DiscOnly, [string]$GameExecutable)
+param([switch]$DiscOnly, [switch]$IconOnly, [string]$GameExecutable)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -10,6 +10,70 @@ function Assert-Condition {
     param([bool]$Condition, [string]$Message)
     if (-not $Condition) { throw $Message }
 }
+
+if ($DiscOnly -and $IconOnly) { throw 'Choose DiscOnly or IconOnly, not both.' }
+if (-not $DiscOnly) {
+    if (-not ('Dash2EnhancedTests.IconResources' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+namespace Dash2EnhancedTests {
+    public static class IconResources {
+        [DllImport("kernel32.dll", EntryPoint = "LoadLibraryExW", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern IntPtr Load(string path, IntPtr file, uint flags);
+        [DllImport("kernel32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool FreeLibrary(IntPtr module);
+        [DllImport("kernel32.dll", EntryPoint = "FindResourceW", SetLastError = true)]
+        private static extern IntPtr FindResource(IntPtr module, IntPtr name, IntPtr type);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern uint SizeofResource(IntPtr module, IntPtr resource);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr LoadResource(IntPtr module, IntPtr resource);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr LockResource(IntPtr resource);
+        public static byte[] Read(IntPtr module, int type, int identifier) {
+            IntPtr resource = FindResource(module, new IntPtr(identifier), new IntPtr(type));
+            if (resource == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error(), "Missing EXE icon resource");
+            uint size = SizeofResource(module, resource);
+            IntPtr data = LockResource(LoadResource(module, resource));
+            if (size == 0 || data == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+            byte[] bytes = new byte[checked((int)size)];
+            Marshal.Copy(data, bytes, 0, bytes.Length);
+            return bytes;
+        }
+    }
+}
+'@
+    }
+    $module = [Dash2EnhancedTests.IconResources]::Load($executable, [IntPtr]::Zero, 2)
+    Assert-Condition ($module -ne [IntPtr]::Zero) 'Cannot open the launcher as a read-only resource file.'
+    try {
+        $group = [Dash2EnhancedTests.IconResources]::Read($module, 14, 1)
+        $icon = [IO.File]::ReadAllBytes((Join-Path $root 'assets\RockmanDash2-Enhanced.ico'))
+        $sizes = @(16, 20, 24, 32, 40, 48, 64, 96, 128, 256)
+        Assert-Condition ([BitConverter]::ToUInt16($icon, 0) -eq 0 -and [BitConverter]::ToUInt16($icon, 2) -eq 1) 'Invalid ICO header.'
+        Assert-Condition ([BitConverter]::ToUInt16($icon, 4) -eq $sizes.Count) 'Unexpected ICO frame count.'
+        Assert-Condition ($group.Length -eq 6 + 14 * $sizes.Count) 'Unexpected EXE icon group size.'
+        Assert-Condition ([Convert]::ToBase64String($group, 0, 6) -ceq [Convert]::ToBase64String($icon, 0, 6)) 'EXE icon group header differs.'
+        for ($index = 0; $index -lt $sizes.Count; $index++) {
+            $entry = 6 + 16 * $index
+            $resourceEntry = 6 + 14 * $index
+            $dimension = if ($sizes[$index] -eq 256) { 0 } else { $sizes[$index] }
+            Assert-Condition ($icon[$entry] -eq $dimension -and $icon[$entry + 1] -eq $dimension) 'Unexpected ICO dimensions.'
+            Assert-Condition ([Convert]::ToBase64String($group, $resourceEntry, 12) -ceq [Convert]::ToBase64String($icon, $entry, 12)) 'EXE icon frame metadata differs.'
+            $identifier = [BitConverter]::ToUInt16($group, $resourceEntry + 12)
+            $bytes = [Dash2EnhancedTests.IconResources]::Read($module, 3, $identifier)
+            $length = [BitConverter]::ToUInt32($icon, $entry + 8)
+            $offset = [BitConverter]::ToUInt32($icon, $entry + 12)
+            Assert-Condition ($offset + $length -le $icon.Length -and $bytes.Length -eq $length) 'Invalid ICO frame bounds.'
+            Assert-Condition ([Convert]::ToBase64String($bytes) -ceq [Convert]::ToBase64String($icon, $offset, $length)) 'Embedded icon pixels differ from the source ICO.'
+        }
+        Write-Host 'EXE icon resources: PASS (all 10 frames match the source ICO, 16-256 pixels).'
+    } finally { [void][Dash2EnhancedTests.IconResources]::FreeLibrary($module) }
+}
+if ($IconOnly) { return }
 
 & {
     $WarningPreference = 'SilentlyContinue'

@@ -9,6 +9,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+$version = '1.0.0'
 $buildDirectory = Join-Path $PSScriptRoot 'build'
 $runtimeDirectory = Join-Path $buildDirectory 'runtime'
 $dependencies = Join-Path $buildDirectory 'dependencies'
@@ -183,7 +184,7 @@ try {
     } finally { $hasher.Dispose() }
     $runtimeFolder = 'dash2-enhanced-' + $packageId
     $gameHash = '48baddc9250dc6b99da7ac15b3ae68b0c088489b7351f79ffb990e3384dd0ebc'
-    $header = @('static constexpr const char* packageVersion = "0.1.2";',
+    $header = @(('static constexpr const char* packageVersion = "' + $version + '";'),
         ('static constexpr const wchar_t* runtimeFolder = L"' + $runtimeFolder + '";'),
         ('static constexpr const char* supportedGameSha256 = "' + $gameHash + '";'),
         'static constexpr PayloadAsset payloadAssets[] = {')
@@ -197,7 +198,9 @@ try {
     [IO.File]::WriteAllText($manifestPath,
         '<?xml version="1.0" encoding="UTF-8"?><assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"><trustInfo xmlns="urn:schemas-microsoft-com:asm.v3"><security><requestedPrivileges><requestedExecutionLevel level="asInvoker" uiAccess="false"/></requestedPrivileges></security></trustInfo></assembly>',
         [Text.Encoding]::ASCII)
-    $resources = @(('1 24 "' + $manifestPath.Replace('\', '/') + '"'))
+    $iconPath = Join-Path $PSScriptRoot 'assets\RockmanDash2-Enhanced.ico'
+    $resources = @(('1 24 "' + $manifestPath.Replace('\', '/') + '"'),
+        ('1 ICON "' + $iconPath.Replace('\', '/') + '"'))
     foreach ($asset in $payload) {
         $resources += [string]$asset.id + ' 10 "' + (Join-Path $runtimeDirectory $asset.path).Replace('\', '/') + '"'
     }
@@ -224,7 +227,7 @@ try {
     })
     [IO.File]::WriteAllText((Join-Path $buildDirectory 'payload-manifest.json'),
         ([ordered]@{
-            version = '0.1.2'
+            version = $version
             runtime_folder = $runtimeFolder
             game_sha256 = $gameHash
             executable_sha256 = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
