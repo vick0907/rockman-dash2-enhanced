@@ -9,7 +9,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$version = '1.0.0'
+$version = '1.0.1'
 $buildDirectory = Join-Path $PSScriptRoot 'build'
 $runtimeDirectory = Join-Path $buildDirectory 'runtime'
 $dependencies = Join-Path $buildDirectory 'dependencies'

@@ -38,7 +38,7 @@ $commit = & git -C $PSScriptRoot rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'A source commit is required.' }
 $tracked = @(& git -C $PSScriptRoot ls-files)
 if ($LASTEXITCODE -ne 0 -or $tracked.Count -eq 0) { throw 'Cannot enumerate corresponding sources.' }
-$rootFiles = @('.gitignore', '.gitattributes', 'Build.ps1', 'Package.ps1', 'Convert-DiscImage.ps1',
+$rootFiles = @('.gitignore', '.gitattributes', 'Build.ps1', 'Package.ps1', 'Convert-DiscImage.ps1', 'Convert-DiscImage.cmd',
     'README.md', 'LICENSE.md', 'THIRD_PARTY_NOTICES.md')
 $extensions = @('.cpp', '.c', '.h', '.hpp', '.ps1', '.json', '.ini', '.txt', '.md', '.mit')
 $documentationImages = @('docs/screenshots/subtitles-opening.png', 'docs/screenshots/subtitles-1080p.png',
@@ -71,7 +71,7 @@ $stage = Join-Path $build ('player-package-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($stage)
 try {
     Copy-Item -LiteralPath $executable -Destination (Join-Path $stage 'RockmanDash2-Enhanced.exe')
-    foreach ($name in @('Convert-DiscImage.ps1', 'README.md', 'LICENSE.md', 'THIRD_PARTY_NOTICES.md')) {
+    foreach ($name in @('Convert-DiscImage.ps1', 'Convert-DiscImage.cmd', 'README.md', 'LICENSE.md', 'THIRD_PARTY_NOTICES.md')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $stage $name)
     }
     foreach ($relative in ($documentationImages + $artworkFiles)) {
@@ -87,7 +87,8 @@ try {
     [IO.Compression.ZipFile]::CreateFromDirectory($stage, $playerArchive)
     & git -C $PSScriptRoot archive --format=zip ('--output=' + $sourceArchive) HEAD
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the corresponding-source archive.' }
-    $checksums = @($playerArchive, $sourceArchive, $executable, (Join-Path $PSScriptRoot 'Convert-DiscImage.ps1')) | ForEach-Object {
+    $checksums = @($playerArchive, $sourceArchive, $executable, (Join-Path $PSScriptRoot 'Convert-DiscImage.ps1'),
+        (Join-Path $PSScriptRoot 'Convert-DiscImage.cmd')) | ForEach-Object {
         (Get-FileHash -LiteralPath $_ -Algorithm SHA256).Hash.ToLowerInvariant() + '  ' + [IO.Path]::GetFileName($_)
     }
     [IO.File]::WriteAllText($checksumPath, (($checksums -join "`n") + "`n"), [Text.Encoding]::ASCII)
