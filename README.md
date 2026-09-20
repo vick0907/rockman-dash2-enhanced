@@ -58,33 +58,13 @@
 
 ## 開始遊玩
 
-1. 將玩家版 ZIP 解壓縮到獨立資料夾，再將 `RockmanDash2-Enhanced.exe` 放到原版 `dash2.exe` 所在的遊戲資料夾。需要轉換映像時，請將 [Convert-DiscImage.cmd](Convert-DiscImage.cmd) 與 [Convert-DiscImage.ps1](Convert-DiscImage.ps1) 放在同一資料夾，這兩個檔案也可留在解壓縮的補丁資料夾。重新分享補丁時，請一併保留說明與授權文件。
-2. **若已掛載先前可用的遊戲光碟，可跳過轉換。** 啟動器會先尋找 CD-ROM 類型、卷標為 `ROCKMANDASH2`，且 `DATA1.CAB` 大小與 SHA-256 符合已驗證版本的光碟。即使 ISO 位於其他資料夾，或遊戲目錄只有尚未轉換的原始映像，也可直接沿用。
+1. **放入啟動器**：下載並解壓縮玩家版 ZIP，將 `RockmanDash2-Enhanced.exe` 放到原版 `dash2.exe` 所在的遊戲資料夾。
+2. **準備光碟**：若已掛載可用的遊戲光碟，可跳過。否則將 `gamez88_d2.iso` 拖到 [Convert-DiscImage.cmd](Convert-DiscImage.cmd)，再把產生的 `gamez88_d2.windows.iso` 放進遊戲資料夾。
+3. **開始遊玩**：雙擊 `RockmanDash2-Enhanced.exe`，即可同時啟用字幕、手把與高解析度支援。解析度可在遊戲設定中調整。
 
-   **不限定 D 槽。** 啟動器會檢查所有光碟機，掛載到 E、F 或其他磁碟機代號也可辨識；不會因為第一台光碟機放的是其他光碟，就停止尋找。
+轉換用的 [Convert-DiscImage.cmd](Convert-DiscImage.cmd) 與 [Convert-DiscImage.ps1](Convert-DiscImage.ps1) 請放在一起。遊玩時保留啟動器視窗，結束請從遊戲正常退出，以儲存設定。
 
-   若沒有符合條件的掛載，啟動器才會尋找遊戲資料夾內的 `gamez88_d2.windows.iso`。若只有 MODE1/2352 原始映像，**將 `gamez88_d2.iso` 拖到 [Convert-DiscImage.cmd](Convert-DiscImage.cmd) 上並放開**，即可自動轉換，不必開啟 PowerShell 或輸入指令。
-
-   一次拖入一個 ISO 或 BIN 檔案；路徑可包含空白、中文或中括號。轉換完成後，視窗會顯示結果並停留，按任意鍵關閉。直接雙擊而未拖入檔案時會顯示操作提示；失敗時也會保留錯誤訊息。
-
-   輸出位於**來源映像的同一資料夾**，例如 `gamez88_d2.iso` 會產生 `gamez88_d2.windows.iso`。來源只會以唯讀方式開啟。重複執行會沿用內容完全相同的結果，但拒絕覆寫內容不同的既有檔案。只支援完整的 MODE1/2352 資料軌，不支援 MODE2、音軌或混合模式配置。若來源已是標準 ISO，會顯示 `AlreadyStandard` 並直接沿用原檔，不另產生映像。
-
-   若映像位於其他資料夾，轉換後可自行掛載，或將產生的 `gamez88_d2.windows.iso` 放到遊戲資料夾供啟動器尋找。原本的指令用法仍可使用，亦可加上 `-DestinationPath` 指定輸出檔名：
-
-   ```powershell
-   powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Convert-DiscImage.ps1 -SourcePath .\gamez88_d2.iso
-   ```
-
-3. 雙擊 `RockmanDash2-Enhanced.exe`，三項遊戲功能就會一併啟用。解析度請在遊戲原生顯示設定選單中選擇，例如 `1920x1080x32`。
-4. 遊玩時請保留啟動器的主控台視窗，並透過遊戲正常離開，讓遊戲儲存設定。結束時只會卸載本次啟動器自行掛載的映像；原先已掛載的光碟會保留。請勿同時執行多個遊戲程序。
-
-若要明確指定其他標準 ISO，可使用：
-
-```powershell
-.\RockmanDash2-Enhanced.exe --iso "D:\Games\MyDisc.windows.iso"
-```
-
-`--iso` 優先於自動辨識既有光碟；指定的路徑不存在或無法使用時會報錯，不會悄悄改用其他掛載。自動辨識只檢查既有光碟，不會複製或轉換映像，也不會卸載玩家原先的掛載。這是啟動前的光碟身分檢查，原版遊戲自己的光碟驗證仍保留。
+## 補充說明
 
 ### 單一 EXE 如何運作
 
@@ -99,6 +79,31 @@
 內嵌內容更新後，啟動器會使用不同的執行資料夾，不會自動搬移舊版手把設定。本補丁不會取代原版主程式、遊戲設定、存檔或原始光碟映像。若要移除，先結束遊戲，再刪除增強啟動器 EXE 與它建立的 `dash2-enhanced-*` 資料夾即可；請保留原版遊戲、存檔、設定及映像檔。
 
 ## 檢查與疑難排解
+
+<details>
+<summary>光碟轉換與進階用法</summary>
+
+- 已掛載的正確遊戲光碟可直接沿用，**不限 D 槽**。啟動器會檢查所有光碟機的類型、`ROCKMANDASH2` 卷標及 `DATA1.CAB` 大小與雜湊；找不到才使用遊戲資料夾中的 `gamez88_d2.windows.iso`。
+- 一次將一個 ISO 或 BIN 拖到 [Convert-DiscImage.cmd](Convert-DiscImage.cmd)，並保留旁邊的 [Convert-DiscImage.ps1](Convert-DiscImage.ps1)。支援空白、中文與中括號路徑；完成或失敗都會保留結果視窗，按任意鍵關閉。
+- 轉換結果放在**來源映像旁**，檔名為 `*.windows.iso`。來源不會被修改；重複轉換會沿用相同內容，拒絕覆寫不同內容的既有檔案。顯示 `AlreadyStandard` 表示原檔已是標準 ISO，可直接掛載使用。
+- 只支援完整 MODE1/2352 資料軌，不支援 MODE2、音軌或混合模式。轉換後可自行掛載，或將 `gamez88_d2.windows.iso` 放進遊戲資料夾。
+- 結束時只卸載本次啟動器自行掛載的映像，原先已掛載的光碟會保留。請勿同時執行多個遊戲程序。原版遊戲的光碟驗證仍保留。
+
+原本的 PowerShell 用法仍可使用，也可加上 `-DestinationPath` 指定輸出檔名：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Convert-DiscImage.ps1 -SourcePath .\gamez88_d2.iso
+```
+
+若要指定其他標準 ISO：
+
+```powershell
+.\RockmanDash2-Enhanced.exe --iso "D:\Games\MyDisc.windows.iso"
+```
+
+`--iso` 優先於自動辨識；路徑不存在或無法使用時會報錯，不會改用其他掛載。啟動器不會自行轉換映像。
+
+</details>
 
 ```powershell
 .\RockmanDash2-Enhanced.exe --self-test
