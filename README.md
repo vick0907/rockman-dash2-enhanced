@@ -1,7 +1,5 @@
 # 洛克人 DASH 2 增強補丁
 
-<img src="assets/RockmanDash2-Enhanced.png" alt="增強版藍色頭盔圖示" width="96" height="96">
-
 針對特定繁體中文版 PC 遊戲製作的非官方 Windows 補丁。玩家只需使用一個 `RockmanDash2-Enhanced.exe`，即可同時啟用繁體中文字幕、XInput 手把及高解析度三項功能；ISO 格式轉換可將映像檔拖到 [Convert-DiscImage.cmd](Convert-DiscImage.cmd)，由同資料夾的 [Convert-DiscImage.ps1](Convert-DiscImage.ps1) 處理。**補丁不含原版遊戲或光碟映像檔，請自行準備。**
 
 目前正式版本為 **v1.0.1**，新增可直接拖入 ISO 的轉換入口。下載請前往 [GitHub 最新正式版](https://github.com/vick0907/rockman-dash2-enhanced/releases/latest)，無須登入即可下載。初次使用建議下載檔名以 `-windows.zip` 結尾的玩家完整包，其中只有一個供玩家啟動的 EXE，並附拖放入口、轉換腳本、中文說明及授權文件。也可單獨下載 EXE；需要轉換 ISO 時，再下載下面的兩個轉換檔案。
